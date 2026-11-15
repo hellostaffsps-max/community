@@ -94,11 +94,13 @@ node --env-file=.env.local scripts/check-connection.mjs
 
 رُفع المصدر إلى المستودع العام `hellostaffsps-max/community` بعد موافقة صريحة، وأول commit هو `862cc61`. حُفظت إعدادات Cloudflare: الفرع `main`، أمر البناء `npm run typecheck && npm test`، وأمر النشر `npm run deploy:vinext`. أُضيفت متغيرات البناء الخاصة بعنوان Supabase ومفتاحه العام و`APP_ORIGIN=https://goatlab.my` و`ALLOW_PUBLIC_SIGNUP=false` وNode `26.12.1` وتعطيل telemetry. لا توجد أسرار إدارية في هذه القيم.
 
-الاتصال القديم بتطبيق GitHub في Cloudflare ما زال يعرض أنه منقطع؛ آخر CI سابق فشل عند جلب المستودع، ولم يثبت نجاح بناء سحابي لهذا المصدر بعد. صفحة إدارة الاتصال تطلب تحقق هوية GitHub عبر بريد صاحب الحساب. روابط workers.dev للإنتاج والمعاينة معطلة، ولا توجد Custom Domains أو Routes على Worker. رفع المصدر لا يعني إتاحة التطبيق على الدومين؛ يلزم اعتماد ذلك بصورة منفصلة.
+أُصلح انقطاع GitHub بإضافة `community` إلى تطبيق Cloudflare Workers and Pages بعد موافقة المالك، دون تغيير اختيارات المستودعات الأخرى. نجح البناء السحابي `c7693b8c-f4e8-4ace-a287-3717a110a382` للنسخة `ec835b4`، وشغّل فحص الأنواع والاختبارات ثم رفع Worker. رقم نسخة Worker الناتجة `91f11059-2a70-40cf-853e-3ca34748923a`، وسجل النشر يؤكد `APP_ORIGIN=https://goatlab.my` و`ALLOW_PUBLIC_SIGNUP=false`.
+
+روابط workers.dev للإنتاج والمعاينة معطلة، ولا توجد Custom Domains أو Routes على Worker؛ سجل النشر يؤكد `No targets deployed for community`. الكود موجود في Cloudflare، لكن التطبيق غير متاح على عنوان عام. لم يُختبر HTTP على النسخة السحابية لعدم ربط عنوان بها؛ اختبارات HTTP المحلية ناجحة. ربط الدومين وإتاحة الموقع يحتاجان اعتمادًا منفصلًا.
 
 ## الدومين والبريد والإطلاق
 
-اختيرت خطة Cloudflare Free بموافقة المستخدم. حُفظت خوادم `lilyana.ns.cloudflare.com` و`sid.ns.cloudflare.com` في Hostinger بموافقة منفصلة. آخر حالة مرصودة: Cloudflare ينتظر انتشار خوادم الأسماء. حُفظت أهداف سجلّي `@` و`www` الحالية؛ لم يُربط Worker بالدومين ولم يُنشر التطبيق.
+اختيرت خطة Cloudflare Free بموافقة المستخدم. حُفظت خوادم `lilyana.ns.cloudflare.com` و`sid.ns.cloudflare.com` في Hostinger بموافقة منفصلة. آخر حالة مرصودة للدومين: انتظار انتشار خوادم الأسماء. حُفظت أهداف سجلّي `@` و`www` الحالية؛ لم يُربط Worker بالدومين ولم يُتح التطبيق للعامة.
 
 قبل الإطلاق يلزم اعتماد عنوان التطبيق النهائي، ثم ضبط Site URL وقائمة Redirect URLs الدقيقة في Supabase (`/auth/callback`)، وإعداد SMTP مناسب واختبار رسائل التأكيد والاستعادة، وإعداد Turnstile في Cloudflare وSupabase والتحقق من عمله، ومراجعة الإعدادات المباشرة لـAuth. لا تعتبر تجربة البريد ناجحة دون وصول رسالة وتكملة الرابط.
 

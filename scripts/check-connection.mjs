@@ -6,7 +6,19 @@ if (url !== `https://${config.supabaseProjectRef}.supabase.co` || !key?.startsWi
   throw new Error('Missing publishable connection details for the allowed community project.');
 }
 const settings=await fetch(url+'/auth/v1/settings',{headers:{apikey:key},signal:AbortSignal.timeout(15000)});
-if(settings.ok){const data=await settings.json();console.log(`direct_signup_disabled: ${data.disable_signup===true}`);}else process.exitCode=1;
+if (settings.ok) {
+  const data = await settings.json();
+  const closed = data.disable_signup === true;
+  const googleDisabled = data.external?.google === false;
+  const appClosed = process.env.ALLOW_PUBLIC_SIGNUP === 'false';
+  console.log(`direct_signup_disabled: ${closed}`);
+  console.log(`google_signin_disabled: ${googleDisabled}`);
+  console.log(`app_signup_disabled: ${appClosed}`);
+  if (!closed || !googleDisabled || !appClosed) process.exitCode = 1;
+} else {
+  console.log(`auth_settings: HTTP ${settings.status}`);
+  process.exitCode = 1;
+}
 for (const [name,path] of [['auth','/auth/v1/health'], ['schema','/rest/v1/recipes?select=id&limit=0']]) {
   const result=await fetch(url+path,{headers:{apikey:key},signal:AbortSignal.timeout(15000)});
   console.log(`${name}: HTTP ${result.status}`);

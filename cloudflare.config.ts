@@ -12,6 +12,7 @@ export default defineConfig(({mode}) => {
     compatibilityFlags: ["nodejs_compat"],
     workersDev: false,
     previewUrls: false,
+    domains: ['goatlab.my'],
     assets: {
       htmlHandling: "none",
       notFoundHandling: "none",

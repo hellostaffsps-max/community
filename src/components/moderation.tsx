@@ -1,0 +1,8 @@
+'use client';
+import Link from 'next/link';
+import {useRouter} from 'next/navigation';
+import type {Report} from '@/lib/types';
+import {api,Notice,useAction} from './shared';
+import {date} from '@/lib/i18n';
+function ReportRow({report}:{report:Report}){const action=useAction();const router=useRouter();const recipeId=report.recipe_id||report.comments?.recipe_id;return <article className="form-section"><div className="card-meta"><span>{report.comment_id?'بلاغ عن تعليق':'بلاغ عن وصفة'}</span><time>{date(report.created_at)}</time></div><h2>{report.recipes?.title||'مراجعة تعليق'}</h2>{report.comments&&<blockquote className="preserve">{report.comments.body}</blockquote>}<p className="preserve"><strong>سبب البلاغ: </strong>{report.reason}</p>{recipeId&&<Link className="text-link" href={`/recipes/${recipeId}`}>عرض الوصفة والسياق</Link>}<div className="inline-actions"><button className="button danger small" disabled={action.busy} onClick={async()=>{if(await action.run(()=>api(`/api/community/moderation/${report.id}`,'POST',{decision:'actioned'})))router.refresh();}}>إخفاء المحتوى</button><button className="button secondary small" disabled={action.busy} onClick={async()=>{if(await action.run(()=>api(`/api/community/moderation/${report.id}`,'POST',{decision:'dismissed'})))router.refresh();}}>إغلاق دون إجراء</button></div>{action.message&&<Notice error>{action.message}</Notice>}</article>;}
+export function Moderation({reports}:{reports:Report[]}){return reports.length?<div>{reports.map(r=><ReportRow key={r.id} report={r}/>)}</div>:<div className="empty"><h2>لا توجد بلاغات معلّقة.</h2><p>ستظهر هنا البلاغات التي تحتاج مراجعتك.</p></div>;}

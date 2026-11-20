@@ -15,7 +15,7 @@ export function AuthForm({mode,signupEnabled,confirmationError}:{mode:string;sig
   const titles:Record<string,string>={login:'أهلًا بعودتك.',signup:'مكانك بين أهل القهوة.',forgot:'لنستعد حسابك.',reset:'كلمة مرور جديدة.',resend:'تأكيد بريدك الإلكتروني.'};
   const isPassword=['login','signup','reset'].includes(mode);const isEmail=mode!=='reset';
   const captcha=!!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY&&mode!=='reset';
-  return <section className="auth-shell"><div className="auth-aside"><span className="eyebrow">GOAT JOURNEY COMMUNITY</span><h1>الخبرة تزيد <br/>لما نشاركها.</h1><p>من أول جرعة إلى آخر رشفة، لكل باريستا تجربة تستحق أن تُروى.</p><span className="large-ring" aria-hidden="true"/></div>
+  return <section className="auth-shell"><div className="auth-aside"><span className="eyebrow">GOAT JOURNEY COMMUNITY</span><h1>الخبرة تزيد <br/>لما نشاركها.</h1><p>من أول جرعة إلى آخر رشفة، لكل باريستا تجربة تستحق أن تُروى.</p><img className="auth-brand-mark" src="/brand/mark-yellow.svg" alt="" width={105} height={105}/></div>
     <div className="auth-panel"><Link className="text-link" href="/">← العودة للمجتمع</Link><h2>{titles[mode]||titles.login}</h2><p>ابدأ من حيث انتهت آخر تجربة.</p>
     {mode==='signup'&&!signupEnabled&&<Notice>التسجيل لم يُفتح بعد. نجهّز المجتمع لاستقبالكم.</Notice>}
     {confirmationError&&<Notice error>رابط التأكيد غير صالح أو انتهت مدته. اطلب رسالة جديدة.</Notice>}

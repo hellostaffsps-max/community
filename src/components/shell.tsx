@@ -18,7 +18,7 @@ export function Shell({children,viewer=null,landing=false,active=''}:{children:R
         {viewer?.moderator&&<Link href="/moderation">المراجعة</Link>}
       </nav>
       <div className="header-actions">
-        <Link className="account-link" href={viewer?'/account':'/auth/login'}><UserRound size={18}/><span>{viewer?'حسابي':'دخول الأعضاء'}</span></Link>
+        <Link className="account-link" href={viewer?'/account':'/auth/login'} aria-current={active==='account'||active.startsWith('auth/')?'page':undefined}><UserRound size={18}/><span>{viewer?'حسابي':'دخول الأعضاء'}</span></Link>
         <Link className="button small" href={viewer?'/recipes/new':'/explore'}>{viewer?'شارك وصفة':'استكشف المجتمع'}<ArrowUpLeft size={18}/></Link>
       </div>
     </div></header>
@@ -33,7 +33,7 @@ export function Shell({children,viewer=null,landing=false,active=''}:{children:R
       <Link href="/" aria-current={landing?'page':undefined}><House size={20}/>الرئيسية</Link>
       <Link href="/explore" aria-current={active==='explore'?'page':undefined}><Compass size={20}/>الوصفات</Link>
       <Link href={viewer?'/recipes/new':'/account?tab=saved'}>{viewer?<Plus size={21}/>:<Bookmark size={20}/>}<span>{viewer?'شارك وصفة':'محفوظاتي'}</span></Link>
-      <Link href={viewer?'/account':'/auth/login'}><UserRound size={20}/>{viewer?'حسابي':'دخول'}</Link>
+      <Link href={viewer?'/account':'/auth/login'} aria-current={active==='account'||active.startsWith('auth/')?'page':undefined}><UserRound size={20}/>{viewer?'حسابي':'دخول'}</Link>
     </nav>
   </>;
 }

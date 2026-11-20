@@ -32,12 +32,12 @@
 
 حُفظ قالب Confirm sign up من `supabase/templates/confirmation-code.html` بعنوان «رمز تأكيد حسابك — Goat Journey Community». يستخدم `{{ .Token }}` ولا يرسل رمز الحساب في URL. عُوين القالب العربي بعد الحفظ. حُفظت إعدادات Email OTP: طول 6 وصلاحية 600 ثانية، والحد الأدنى لكلمة المرور 12. تأكيد البريد مفعّل، وGoogle والدخول المجهول معطّلان.
 
-أُنشئ Turnstile باسم `community` لنطاق `goatlab.my` فقط، بوضع Managed وبدون pre-clearance. مفتاحه العام مخصص لـ`NEXT_PUBLIC_TURNSTILE_SITE_KEY` في بناء Cloudflare. مكان السر هو CAPTCHA في Supabase Auth فقط؛ لا يدخل ملفات التطبيق. لم يُحفظ تفعيل CAPTCHA بعد حتى تنشر واجهة الدخول المتوافقة معه.
+أُنشئ Turnstile باسم `community` لنطاق `goatlab.my` فقط، بوضع Managed وبدون pre-clearance. مفتاحه العام محفوظ في `NEXT_PUBLIC_TURNSTILE_SITE_KEY` في بناء Cloudflare، وتأكد وجود المفتاح الصحيح في ملفات الموقع المنشورة. حُفظ السر وتفعيل CAPTCHA في Supabase Auth؛ لا يدخل السر ملفات التطبيق. أثبت اختبار طلب دخول بلا CAPTCHA أن Supabase يرفضه بـHTTP 400 و`captcha_failed`، دون إنشاء مستخدم أو إرسال بريد.
 
 ## حالة الإطلاق والتحقق المتبقي
 
-التسجيل العام ما زال مغلقًا في آخر تحقق: `ALLOW_PUBLIC_SIGNUP=false` و`disable_signup=true`. الكود الجديد يرفض التسجيل ما لم يُضبط علم الفتح والمفتاح العام معًا.
+حُفظ `ALLOW_PUBLIC_SIGNUP=true` في بناء Cloudflare، وتأكد مباشرة من إعدادات Supabase أن `disable_signup=false` و`mailer_autoconfirm=false` و`external.google=false`. تُطبّق قيمة Cloudflare عند بناء ونشر نسخة جديدة؛ لا تتغير بمجرد حفظ قيمة البناء. الكود يرفض التسجيل ما لم يُضبط علم الفتح والمفتاح العام معًا. الإعداد المحلي يبقى مغلقًا افتراضيًا.
 
-قبل إعلان اكتمال الإطلاق: نشر الواجهة مع المفتاح العام، حفظ حماية Turnstile في Supabase، فتح التسجيل في الخدمتين، ثم إكمال تسجيل حقيقي بواسطة المالك والتحقق من وصول الرمز والجلسة واستعادة كلمة المرور. لا تدخل كلمة المرور أو الرمز في المحادثة، ولا تعتبر نجاح البناء أو حفظ SMTP دليلًا على وصول البريد.
+المتبقي لاختبار البريد من البداية للنهاية: إكمال تسجيل حقيقي بواسطة المالك والتحقق من وصول الرمز والجلسة واستعادة كلمة المرور. يدخل المالك كلمة المرور والرمز مباشرة في الموقع، دون إرسالها في المحادثة. لا تعتبر نجاح البناء أو حفظ SMTP دليلًا على وصول البريد، ولا تنشئ حسابًا وهميًا في الإنتاج.
 
 المراجع: [Resend SMTP](https://resend.com/docs/send-with-supabase-smtp)، [Supabase SMTP](https://supabase.com/docs/guides/auth/auth-smtp)، [قوالب البريد](https://supabase.com/docs/guides/auth/auth-email-templates).

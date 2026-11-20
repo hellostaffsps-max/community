@@ -1,1 +1,1 @@
-export default function Loading(){return <div className="container loading" role="status"><span className="spinner"/>جاري تحضير الصفحة…</div>;}
+export default function Loading(){return <div className="app-loading" role="status"><img src="/brand/mark.svg" width={48} height={48} alt=""/><p>نفتح لك الصفحة…</p><div className="loading-lines" aria-hidden="true"><span/><span/><span/></div><div className="loading-cards" aria-hidden="true"><span/><span/><span/></div></div>;}

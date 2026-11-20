@@ -42,7 +42,7 @@ export default async function CommunityPage({params,searchParams}:{params:Promis
  if(isAuth)return <Shell viewer={viewer} active={route}><AuthForm key={path[1]} mode={path[1]} signupEnabled={!unavailable&&publicSignupEnabled()} confirmationError={!!value('error')}/></Shell>;
  if(route==='')return <Shell viewer={viewer} landing><Landing/></Shell>;
  if(unavailable)return <Shell viewer={viewer}><section className="connection-state"><Coffee size={40} strokeWidth={1.2}/><span className="eyebrow">GOAT JOURNEY COMMUNITY</span><h1>نحضّر المساحة لتجاربكم.</h1><p>تعذّر تحميل المجتمع الآن. حاول مجددًا بعد قليل.</p><Link className="button" href="/">إعادة المحاولة</Link></section></Shell>;
- return <Shell viewer={viewer} active={route}>
+ return <Shell viewer={viewer} active={route} accountTab={tab}>
  {route==='explore'&&<Explore data={data} viewer={viewer} q={q} method={method} page={page}/>}
  {(isNew||isEdit)&&<RecipeEditor key={data.recipe?`${data.recipe.id}-${data.recipe.version}`:'new'} recipe={data.recipe} categories={data.categories||[]}/>}
  {isDetail&&data.recipe&&<RecipeDetail key={data.recipe.id} recipe={data.recipe} comments={data.comments||[]} initialSaved={data.saved||false} viewer={viewer}/>}

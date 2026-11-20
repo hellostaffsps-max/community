@@ -3,8 +3,9 @@ import {ArrowUpLeft,Coffee,Search} from 'lucide-react';
 import {Cards} from './shared';
 import type {PageData,Viewer} from '@/lib/types';
 import {publicSignupEnabled} from '@/lib/env';
+import {brewingTools} from '@/lib/recipe-builder';
 
-const methods=['V60','Espresso','AeroPress','French Press','Cold Brew','Turkish'];
+const methods=brewingTools.map(([value])=>value);
 
 export function Explore({data,viewer,q,method,page}:{data:PageData;viewer:Viewer|null;q:string;method:string;page:number}){
   const signupEnabled=publicSignupEnabled();

@@ -2,13 +2,15 @@ import Link from 'next/link';
 import {ArrowUpLeft,Coffee,Search} from 'lucide-react';
 import {Cards} from './shared';
 import type {PageData,Viewer} from '@/lib/types';
+import {publicSignupEnabled} from '@/lib/env';
 
 const methods=['V60','Espresso','AeroPress','French Press','Cold Brew','Turkish'];
 
 export function Explore({data,viewer,q,method,page}:{data:PageData;viewer:Viewer|null;q:string;method:string;page:number}){
+  const signupEnabled=publicSignupEnabled();
   const href=(m:string,p=page)=>'/explore?'+new URLSearchParams({q,method:m,page:String(p+1)});
   return <>
-    <section className="explore-heading"><div><span className="overline">دفتر المجتمع / وصفات القهوة</span><h1>ماذا سنحضّر اليوم؟</h1><p>ابحث عن طريقتك المفضلة، واقرأ تفاصيل كل تجربة. الفنجان القادم يبدأ من هنا.</p></div>{viewer?<Link className="button" href="/recipes/new">شارك وصفتك<ArrowUpLeft size={20}/></Link>:<span className="discovery-status">التصفّح مفتوح · التسجيل مغلق حاليًا</span>}</section>
+    <section className="explore-heading"><div><span className="overline">دفتر المجتمع / وصفات القهوة</span><h1>ماذا سنحضّر اليوم؟</h1><p>ابحث عن طريقتك المفضلة، واقرأ تفاصيل كل تجربة. الفنجان القادم يبدأ من هنا.</p></div>{viewer?<Link className="button" href="/recipes/new">شارك وصفتك<ArrowUpLeft size={20}/></Link>:signupEnabled?<Link className="button" href="/auth/signup">انضم وشارك مجانًا<ArrowUpLeft size={20}/></Link>:<span className="discovery-status">التصفّح مفتوح · التسجيل مغلق حاليًا</span>}</section>
     <section className="explore-section" aria-label="تصفّح وصفات المجتمع">
       <form className="search-form" action="/explore" role="search"><label className="search-input"><Search size={20}/><span className="sr-only">ابحث في الوصفات</span><input name="q" defaultValue={q} maxLength={120} placeholder="ابحث عن وصفة، بن، أو نكهة…"/></label><label><span className="sr-only">طريقة التحضير</span><select name="method" defaultValue={method}><option value="">كل طرق التحضير</option>{methods.map(m=><option key={m}>{m}</option>)}</select></label><button className="button small">بحث</button>{(q||method)&&<Link className="text-link" href="/explore">مسح</Link>}</form>
       <div className="filter-chips"><Link className={!method?'active':''} aria-current={!method?'page':undefined} href={href('',0)}>الكل</Link>{methods.map(m=><Link className={method===m?'active':''} aria-current={method===m?'page':undefined} key={m} href={href(m,0)}>{m}</Link>)}</div>

@@ -1,5 +1,9 @@
 import project from '../../community.config.json';
 
+export function publicSignupEnabled() {
+  return process.env.ALLOW_PUBLIC_SIGNUP === 'true' && !!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+}
+
 export function connection() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;

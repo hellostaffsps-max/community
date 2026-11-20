@@ -4,7 +4,7 @@ import {Coffee,MapPin} from 'lucide-react';
 import {supabase} from '@/lib/supabase/server';
 import {viewer as getViewer,explore,detail,account,reports} from '@/lib/data';
 import type {PageData,Viewer,Profile} from '@/lib/types';
-import {connection} from '@/lib/env';
+import {connection,publicSignupEnabled} from '@/lib/env';
 import {HttpError} from '@/lib/http';
 import {uuid} from '@/lib/validation';
 import {Shell} from '@/components/shell';
@@ -20,7 +20,7 @@ export const dynamic='force-dynamic';
 function Pagination({page,more,base,query}:{page:number;more?:boolean;base:string;query:Record<string,string>}){function href(p:number){return `${base}?${new URLSearchParams({...query,page:String(p+1)})}`;}return (page>0||more)?<nav className="pagination" aria-label="صفحات النتائج">{page>0&&<Link className="button secondary small" href={href(page-1)}>السابق</Link>}<span>صفحة {page+1}</span>{more&&<Link className="button secondary small" href={href(page+1)}>التالي</Link>}</nav>:null;}
 export default async function CommunityPage({params,searchParams}:{params:Promise<{slug?:string[]}>;searchParams:Promise<Record<string,string|string[]|undefined>>}){
  const path=(await params).slug||[];const search=await searchParams;const value=(key:string)=>typeof search[key]==='string'?search[key] as string:'';const page=Math.min(1000,Math.max(0,(Number.parseInt(value('page'),10)||1)-1));const q=value('q').slice(0,120);const method=value('method').slice(0,80);const tab=['drafts','saved','profile'].includes(value('tab'))?value('tab'):'published';
- const route=path.join('/');const isAuth=path[0]==='auth'&&path.length===2&&['login','signup','forgot','reset','resend'].includes(path[1]);const isNew=route==='recipes/new';const isDetail=path[0]==='recipes'&&path.length===2&&!isNew;const isEdit=path[0]==='recipes'&&path.length===3&&path[2]==='edit';const isMember=path[0]==='members'&&path.length===2;
+ const route=path.join('/');const isAuth=path[0]==='auth'&&path.length===2&&['login','signup','forgot','reset','resend','verify'].includes(path[1]);const isNew=route==='recipes/new';const isDetail=path[0]==='recipes'&&path.length===2&&!isNew;const isEdit=path[0]==='recipes'&&path.length===3&&path[2]==='edit';const isMember=path[0]==='members'&&path.length===2;
  if(!(route===''||route==='explore'||route==='account'||route==='moderation'||isAuth||isNew||isDetail||isEdit||isMember))notFound();
  if(route===''&&['q','method','page'].some(key=>key in search))redirect('/explore?'+new URLSearchParams({q,method,page:String(page+1)}));
  if((isDetail||isEdit)&&!uuid.safeParse(path[1]).success)notFound();
@@ -39,7 +39,7 @@ export default async function CommunityPage({params,searchParams}:{params:Promis
  if(missing)notFound();
  if((isNew||isEdit||route==='account'||route==='moderation'||route==='auth/reset')&&!viewer&&!unavailable)redirect('/auth/login');
  if((route==='moderation'&&!viewer?.moderator)||denied)return <Shell viewer={viewer}><div className="empty"><h1>هذه الصفحة غير متاحة لحسابك.</h1><Link className="button" href="/">العودة للمجتمع</Link></div></Shell>;
- if(isAuth)return <Shell viewer={viewer} active={route}><AuthForm mode={path[1]} signupEnabled={!unavailable&&process.env.ALLOW_PUBLIC_SIGNUP==='true'&&!!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY} confirmationError={!!value('error')}/></Shell>;
+ if(isAuth)return <Shell viewer={viewer} active={route}><AuthForm key={path[1]} mode={path[1]} signupEnabled={!unavailable&&publicSignupEnabled()} confirmationError={!!value('error')}/></Shell>;
  if(route==='')return <Shell viewer={viewer} landing><Landing/></Shell>;
  if(unavailable)return <Shell viewer={viewer}><section className="connection-state"><Coffee size={40} strokeWidth={1.2}/><span className="eyebrow">GOAT JOURNEY COMMUNITY</span><h1>نحضّر المساحة لتجاربكم.</h1><p>تعذّر تحميل المجتمع الآن. حاول مجددًا بعد قليل.</p><Link className="button" href="/">إعادة المحاولة</Link></section></Shell>;
  return <Shell viewer={viewer} active={route}>

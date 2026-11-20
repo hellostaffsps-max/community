@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import {normalizeEmailCode} from './email-code';
 const short=(max:number)=>z.string().trim().max(max).default('');
 const metric=(max:number,min=0)=>z.number().finite().min(min).max(max).nullable().optional();
 export const uuid=z.uuid();
@@ -18,8 +19,9 @@ export type RecipeInput=z.infer<typeof recipeSchema>;
 export const profileSchema=z.object({username:z.string().trim().toLowerCase().regex(/^[a-z0-9_]{3,30}$/),display_name:z.string().trim().min(1).max(60),bio:short(500),city:short(80),workplace:short(120),country_code:z.string().regex(/^[A-Z]{2}$/).default('PS')}).strict();
 export const commentSchema=z.object({recipe_id:uuid,body:z.string().trim().min(1).max(2000)}).strict();
 export const reportSchema=z.object({recipe_id:uuid.optional(),comment_id:uuid.optional(),reason:z.string().trim().min(5).max(1000)}).strict().refine(r=>Boolean(r.recipe_id)!==Boolean(r.comment_id),'اختر محتوى واحدًا للإبلاغ');
-export const authSchema=z.object({email:z.email().max(254),password:z.string().min(12).max(128),captchaToken:z.string().max(4096).optional()}).strict();
+export const authSchema=z.object({email:z.string().trim().pipe(z.email().max(254)),password:z.string().min(12).max(128),captchaToken:z.string().max(4096).optional()}).strict();
 export const emailSchema=authSchema.omit({password:true});
+export const emailCodeSchema=z.object({email:authSchema.shape.email,token:z.string().max(16).transform(normalizeEmailCode).refine(code=>code!==null,'أدخل رمزًا من 6 أرقام.').transform(code=>code!)}).strict();
 export function imageType(bytes:Uint8Array) {
   if(bytes.length<12) return null;
   if(bytes[0]===0xff&&bytes[1]===0xd8&&bytes[2]===0xff) return {mime:'image/jpeg',ext:'jpg'};

@@ -57,7 +57,7 @@ Browser-tested during this implementation: category filtering; opening a starter
 
 The 320px privacy, recipe detail/comments and editor-counter captures were inspected as additional implementation states. The file search-empty-desktop-v2.jpg actually captures the empty filtered explore route; it is not mislabeled here as a separate search-route verification.
 
-The root agent's latest local verification record reports:
+The root agent's earlier design-phase verification record reports:
 
 - 125 full tests passed before the final CSS-only contrast correction.
 - TypeScript, the Next production build and the Cloudflare/vinext build passed before that correction.

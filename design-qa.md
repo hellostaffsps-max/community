@@ -2,7 +2,7 @@
 
 final result: passed
 
-Reviewed: 2026-11-21. This result covers the local rendered implementation and the specified Gronda-inspired adaptation. No actionable P0/P1/P2 finding remains in the reviewed states. It does not attest to production deployment or a successful live Google OAuth round trip; those are still pending.
+Reviewed: 2026-11-21. This result covers the rendered Gronda-inspired adaptation, with production checks appended below. No actionable P0/P1/P2 visual finding remains in the reviewed states. Design 9444a23 and provider-discovery fix 5a43e3b are deployed and verified at the route/UI level. A real Google OAuth round trip subsequently passed, preserving the requested saved-recipes destination and the session after reload.
 
 ## Evidence and scope
 
@@ -63,10 +63,20 @@ The root agent's latest local verification record reports:
 - TypeScript, the Next production build and the Cloudflare/vinext build passed before that correction.
 - 15 local HTTP smoke groups passed with free signup open, covering discovery/search/people continuation, auth gating, cross-origin/unauthenticated writes and invalid media paths.
 - Final contrast edits parsed successfully with PostCSS and passed git diff --check.
-- Latest browser console errors and warnings were empty; normal text tokens were confirmed as RGB(111,111,111), and narrow views had equal client/scroll widths.
+- Local browser console errors and warnings were empty; normal text tokens were confirmed as RGB(111,111,111), and narrow views had equal client/scroll widths. The production auth browser recorded diagnostic messages inside Cloudflare's third-party Turnstile frame; its challenge completed and the email submit control became enabled. These were not application-source errors.
 
-Earlier build warnings were non-fatal: lucide optimization fallback, plugin sourcemaps, ineffective dynamic imports, timing/debugName notices and privacy marked unknown by static route analysis. Production CI will rerun validation. The temporary review route was removed before production builds; review fixture material is local/ignored and is not deployed.
+Earlier build warnings were non-fatal: lucide optimization fallback, plugin sourcemaps, ineffective dynamic imports, timing/debugName notices and privacy marked unknown by static route analysis. Successful production builds are recorded below. The temporary review route was removed before production builds; review fixture material is local/ignored and is not deployed.
 
-## Remaining release verification
+## Production verification — 2026-11-21
 
-The local design review is passed. Production deployment, exact deployed-revision verification and a real Google OAuth round trip preserving the intended destination are still pending. This report does not represent them as complete. Gronda messaging, video/per-step media, masterclasses and PRO subscriptions remain intentionally outside the implemented scope.
+Design revision 9444a23 deployed successfully through Cloudflare build 78051f36-71dd-48e9-b0a9-0f645bee821a, producing Worker 82bb457d-9394-4c87-b768-86d1f90843fb. Live discovery/search, opening the French Press guide and privacy at 320px were verified. The production captures were also opened in this review: [exploration](docs/screenshots/gronda-implementation/production-explore-mobile.jpg), [guide](docs/screenshots/gronda-implementation/production-guide-mobile.jpg) and [privacy](docs/screenshots/gronda-implementation/production-privacy-320.jpg). Their pixels are 375 × 844, 375 × 844 and 305 × 780 respectively; the design layout remains consistent with the reviewed local implementation.
+
+Live testing found a separate functional issue: Workers rejected the provider-settings fetch option redirect: "error", so the deployed app returned no providers despite Google being enabled. Fix 5a43e3b uses manual redirect handling and rejects 3xx and already-redirected responses. After 42 focused auth tests and TypeScript passed, it deployed successfully through build 3e22c3c1-6853-4e0a-a4ea-802a1e2db973, Worker 86ad5593-49a8-4b20-8b26-700dda71565d. All seven live GET route groups passed; providers returned exactly ['google'], and the browser showed Google with Apple absent. [Production login evidence](docs/screenshots/gronda-implementation/production-login-mobile.jpg) records provider visibility. The separate real OAuth/session verification is documented below.
+
+The live /ui-review absence check passed semantically: no fixture page/content, notFound UI, noindex and a 404 digest were present. The streamed response retained HTTP 200 and was recorded with a soft-404 warning. [Next.js documents that streaming can retain HTTP 200 while rendering not-found](https://nextjs.org/docs/app/api-reference/file-conventions/not-found); status alone was not used to infer fixture availability.
+
+## Release outcome and remaining test limits
+
+The design review, deployments and above live checks are complete. Google Cloud's audience is verified as In production. After the owner's explicit Continue approval, the real Google OAuth flow returned to https://goatlab.my/account?tab=saved. Reloading preserved the authenticated saved tab and logout control, proving session persistence and the intended next destination. No profile edits, recipes or comments were written. [Authenticated production evidence](docs/screenshots/gronda-implementation/production-google-account-mobile.jpg) records the result. The consent screen displays the Supabase project domain, requests name/profile picture/email only, and links to goatlab.my/privacy.
+
+Real-account password recovery and following between two accounts remain untested. Apple is still inactive and no purchase occurred. Gronda messaging, video/per-step media, masterclasses and PRO subscriptions remain intentionally outside the implemented scope.

@@ -25,6 +25,7 @@ export function MemberProfile({profile,recipes,viewer,pagination,followingEnable
   const path='/members/'+profile.username;
   const published=recipes.filter(recipe=>recipe.status==='published'&&!recipe.hidden_at);
   const showCount=typeof totalRecipes==='number'&&Number.isInteger(totalRecipes)&&totalRecipes>=0;
+  const emptyPage=showCount&&totalRecipes!>0&&published.length===0;
   return <div className="journey-profile journey-member">
     <Link className="journey-profile-back" href="/people"><ArrowRight size={16}/>أهل القهوة</Link>
     <header className="journey-profile-header">
@@ -42,7 +43,7 @@ export function MemberProfile({profile,recipes,viewer,pagination,followingEnable
 
     <section className="journey-profile-publications" aria-labelledby="journey-publications-title">
       <div className="journey-profile-tabs journey-profile-feed-title"><h2 id="journey-publications-title"><BookOpen size={18}/>الوصفات{showCount&&<span className="journey-profile-recipe-count"><bdi>{number(totalRecipes!)}</bdi><span className="sr-only"> وصفة منشورة</span></span>}</h2></div>
-      {published.length?<CommunityFeed recipes={published} viewer={viewer} savedIds={savedIds} showAuthor={false} headingLevel={3}/>:<div className="journey-profile-empty"><Coffee size={34} strokeWidth={1.4}/><h3>{own?'وصفتك الأولى تبدأ هنا.':'لم تُنشر وصفات بعد.'}</h3><p>{own?'شارك تجربتك عندما تصبح جاهزة. مسوداتك تبقى خاصة بك.':'تعرّف إلى تجارب أخرى من أهل القهوة.'}</p><Link className="button secondary small" href={own?'/recipes/new':'/people'}>{own?'ابدأ وصفة':'اكتشف أهل القهوة'}<ArrowUpLeft size={17}/></Link></div>}
+      {published.length?<CommunityFeed recipes={published} viewer={viewer} savedIds={savedIds} showAuthor={false} headingLevel={3}/>:<div className="journey-profile-empty"><Coffee size={34} strokeWidth={1.4}/><h3>{emptyPage?'لا توجد وصفات في هذه الصفحة.':own?'وصفتك الأولى تبدأ هنا.':'لم تُنشر وصفات بعد.'}</h3><p>{emptyPage?'ارجع إلى الصفحة الأولى لعرض الوصفات المنشورة.':own?'شارك تجربتك عندما تصبح جاهزة. مسوداتك تبقى خاصة بك.':'تعرّف إلى تجارب أخرى من أهل القهوة.'}</p><Link className="button secondary small" href={emptyPage?path:own?'/recipes/new':'/people'}>{emptyPage?'الصفحة الأولى':own?'ابدأ وصفة':'اكتشف أهل القهوة'}<ArrowUpLeft size={17}/></Link></div>}
       {pagination}
     </section>
   </div>;

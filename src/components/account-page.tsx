@@ -17,7 +17,7 @@ export function AccountPage({profile,recipes,tab,pagination}:{profile:Profile;re
   const content=copy[tab]||copy.published;const selected=sections.find(section=>section.key===tab)||sections[0];const Icon=selected.icon;
   const needsSetup=accountNeedsSetup(profile);const generatedUsername=hasGeneratedUsername(profile.username);
   return <div className={'journey-profile journey-account journey-account-'+tab}>
-    <header className="journey-profile-header">
+    {tab==='profile'?<header className="journey-account-settings-header"><h1>إعدادات الحساب</h1></header>:<header className="journey-profile-header">
       <div className="journey-profile-avatar"><Avatar profile={profile}/></div>
       <h1>{hasDefaultDisplayName(profile.display_name)?'أهلًا بك بين أهل القهوة.':profile.display_name}</h1>
       {!generatedUsername&&<p className="journey-profile-handle" dir="ltr">@{profile.username}</p>}
@@ -29,7 +29,7 @@ export function AccountPage({profile,recipes,tab,pagination}:{profile:Profile;re
         <Link className="button small" href="/recipes/new"><Plus size={17}/>وصفة جديدة</Link>
         {!generatedUsername&&<Link className="journey-profile-public-link" href={'/members/'+profile.username}>ملفي العام<ArrowUpLeft size={15}/></Link>}
       </div>
-    </header>
+    </header>}
 
     {needsSetup&&tab==='published'&&<section className="journey-welcome" aria-labelledby="journey-welcome-title">
       <div className="journey-welcome-heading"><h2 id="journey-welcome-title">ابدأ من هنا</h2><p>خطوات صغيرة لمساحة تشبهك.</p></div>

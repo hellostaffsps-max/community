@@ -2,7 +2,12 @@ import type {Metadata} from 'next';
 import Link from 'next/link';
 import {ArrowUpLeft,Mail,ShieldCheck} from 'lucide-react';
 import {Shell} from '@/components/shell';
+import {supabase} from '@/lib/supabase/server';
+import {viewer as getViewer} from '@/lib/data';
+import type {Viewer} from '@/lib/types';
 import styles from './privacy.module.css';
+
+export const dynamic='force-dynamic';
 
 export const metadata:Metadata={
   title:'سياسة الخصوصية',
@@ -10,8 +15,10 @@ export const metadata:Metadata={
   alternates:{canonical:'https://goatlab.my/privacy'},
 };
 
-export default function PrivacyPage(){
-  return <Shell active="privacy"><article className={styles.page}>
+export default async function PrivacyPage(){
+  let viewer:Viewer|null=null;
+  try{viewer=await getViewer(await supabase());}catch{/* The privacy policy stays readable if authentication is temporarily unavailable. */}
+  return <Shell active="privacy" viewer={viewer}><article className={styles.page}>
     <header className={styles.header}>
       <span className={styles.eyebrow}><ShieldCheck size={18}/>Goat Journey Community</span>
       <h1>سياسة الخصوصية</h1>

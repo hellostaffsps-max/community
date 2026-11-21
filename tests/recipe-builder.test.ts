@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {editorNumber,editorPayload,fieldStage,initialEditorValues,initialEditorIngredients,legacyMetricConflicts,validateEditor} from '../src/lib/recipe-builder';
+import {editorErrorField,editorNumber,editorPayload,fieldStage,initialEditorValues,initialEditorIngredients,legacyMetricConflicts,restoreEditorRow,validateEditor,validateEditorForm} from '../src/lib/recipe-builder';
 import {deriveIngredientMetrics} from '../src/lib/recipe-quantities';
 describe('recipe builder input and publication',()=>{
   const values={...initialEditorValues(),title:'قهوة الصباح',method:'V60'};
@@ -28,6 +28,51 @@ describe('recipe builder input and publication',()=>{
   });
   it('returns validation errors to the step that actually contains the field',()=>{
     expect(fieldStage('beans')).toBe(1);expect(fieldStage('roaster')).toBe(1);expect(fieldStage('ingredients.0.name')).toBe(1);expect(fieldStage('time_seconds')).toBe(1);expect(fieldStage('steps.0.instruction')).toBe(2);expect(fieldStage('method')).toBe(0);
+  });
+  it('attaches errors to the visible ingredient and step after blank placeholders are omitted from the API payload',()=>{
+    const ingredients=[{key:'blank',name:'',quantity:'',unit:'g'},{key:'missing-name',name:'',quantity:'20',unit:'g'},{key:'bad-quantity',name:'حليب',quantity:'0',unit:'ml'}];
+    const steps=[{key:'blank-step',instruction:'  '},{key:'long-step',instruction:'x'.repeat(2001)}];
+    const result=validateEditorForm(values,ingredients,steps,'draft');
+    expect(result.data).toBeUndefined();
+    expect(result.errors['ingredients.1.name']).toBeTruthy();
+    expect(result.errors['ingredients.2.quantity']).toBeTruthy();
+    expect(result.errors['ingredients.2.quantity']).toBe('اكتب كمية أكبر من صفر، أو اتركها فارغة.');
+    expect(result.errors['ingredients.1.name']).toContain('اسم المكوّن');
+    expect(result.errors['steps.1.instruction']).toBeTruthy();
+    expect(Object.keys(result.errors)).not.toContain('ingredients.0.name');
+    expect(editorErrorField('ingredients.2.quantity',ingredients,steps,values)).toBe('quantity-bad-quantity');
+    expect(editorErrorField('steps.1.instruction',ingredients,steps,values)).toBe('step-long-step');
+  });
+  it('targets missing rows and invalid time fields without losing Arabic input or changing the submitted data',()=>{
+    expect(editorErrorField('ingredients',[],[],values)).toBe('add-ingredient');
+    expect(editorErrorField('steps',[],[],values)).toBe('add-step');
+    expect(editorErrorField('time_seconds',[],[],{...values,minutes:'٣',seconds:'٦٠'})).toBe('seconds');
+    expect(editorErrorField('time_seconds',[],[],{...values,minutes:'١٫٥',seconds:'٣٠'})).toBe('minutes');
+    const ingredients=[{key:'blank',name:'',quantity:'',unit:'g'},{key:'coffee',name:'قهوة',quantity:'١٨',unit:'g'}];
+    const steps=[{key:'blank',instruction:''},{key:'first',instruction:'حضّر القهوة'}];
+    expect(validateEditorForm(values,ingredients,steps,'published').data).toEqual(validateEditor(editorPayload(values,ingredients,steps,'published')).data);
+  });
+  it('attaches invalid derived totals to the same visible quantity field that receives focus',()=>{
+    const ingredients=[{key:'blank',name:'',quantity:'',unit:'g'},{key:'coffee-first',name:'قهوة',quantity:'600',unit:'g'},{key:'coffee-second',name:'بن',quantity:'600',unit:'g'},{key:'water',name:'ماء',quantity:'21',unit:'l'}];
+    const result=validateEditorForm(values,ingredients,[],'draft');
+    expect(result.data).toBeUndefined();
+    expect(result.errors['ingredients.1.quantity']).toContain('مجموع جرعة البن');
+    expect(result.errors['ingredients.3.quantity']).toContain('مجموع الماء');
+    expect(result.errors.dose_g).toBeUndefined();expect(result.errors.water_g).toBeUndefined();
+    expect(editorErrorField('ingredients.1.quantity',ingredients,[],values)).toBe('quantity-coffee-first');
+    expect(editorErrorField('ingredients.3.quantity',ingredients,[],values)).toBe('quantity-water');
+    expect(result.errors['ingredients.0.quantity']).toBeUndefined();
+  });
+  it('undoes one deleted row at its position while retaining newer edits and respecting row limits',()=>{
+    const removed={item:{key:'b',name:'حليب',quantity:'100',unit:'ml'},index:1};
+    const current=[{key:'a',name:'قهوة',quantity:'20',unit:'g'},{key:'c',name:'سكر',quantity:'2',unit:'tsp'}];
+    const restored=restoreEditorRow(current,removed);
+    expect(restored.map(row=>row.key)).toEqual(['a','b','c']);
+    expect(restored[0].quantity).toBe('20');expect(restored[1]).toEqual(removed.item);
+    expect(current).toHaveLength(2);
+    expect(restoreEditorRow(restored,removed)).toEqual(restored);
+    const full=Array.from({length:30},(_,index)=>({...current[0],key:String(index)}));
+    expect(restoreEditorRow(full,removed)).toHaveLength(30);
   });
   it('uses ingredient amounts as the only authority instead of stale metric fields',()=>{
     const payload=editorPayload({...values,dose_g:'99',water_g:'999'},[{key:'coffee',name:'قهوة',quantity:'١٨',unit:'g'},{key:'water',name:'ماء',quantity:'٠٫٣',unit:'l'}],[],'draft');

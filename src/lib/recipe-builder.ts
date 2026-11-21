@@ -50,7 +50,10 @@ export function validateEditor(payload:ReturnType<typeof editorPayload>):{data?:
   const parsed=recipeSchema.safeParse(payload);const errors:FieldErrors={};
   if(!parsed.success)for(const issue of parsed.error.issues){
     const key=issue.path.join('.');const field=String(issue.path[0]);
-    errors[key]=field==='title'?'اكتب اسمًا من حرفين إلى 120 حرفًا.':field==='time_seconds'?'أدخل دقائق صحيحة، وثواني بين 0 و59 (الحد الأقصى 48 ساعة).':field==='ingredients'?'اختر اسم المكوّن واكتب كمية صحيحة أكبر من صفر، أو اترك الكمية فارغة.':field==='steps'?'أضف خطوة تحضير واحدة على الأقل، بحد أقصى 2000 حرف للخطوة.':`${fieldLabels[field]||'هذا الحقل'}: راجع القيمة والطول المسموح.`;
+    if(field==='ingredients'){
+      const part=issue.path[2];const quantity=payload.ingredients[Number(issue.path[1])]?.quantity;
+      errors[key]=part==='name'?'اختر اسم المكوّن أو اكتب اسمه (حتى 100 حرف).':part==='unit'?'اكتب وحدة لا تزيد على 30 حرفًا.':part==='quantity'?issue.code==='too_big'?'الكمية يجب ألا تزيد على 100000.':typeof quantity==='number'&&quantity>0&&quantity<0.01?'أصغر كمية مسموحة هي 0.01، أو اتركها فارغة.':'اكتب كمية أكبر من صفر، أو اتركها فارغة.':'يمكن إضافة 30 مكوّنًا كحد أقصى.';
+    }else errors[key]=field==='title'?'اكتب اسمًا من حرفين إلى 120 حرفًا.':field==='time_seconds'?'أدخل دقائق صحيحة، وثواني بين 0 و59 (الحد الأقصى 48 ساعة).':field==='dose_g'?'مجموع جرعة البن يجب أن يكون بين 0.01 و1000 غرام. عدّل كمية البن أو وحدتها.':field==='water_g'?'مجموع الماء يجب أن يكون بين 0.01 و20000 غرام. عدّل كمية الماء أو وحدتها.':field==='steps'?'أضف خطوة تحضير واحدة على الأقل، بحد أقصى 2000 حرف للخطوة.':`${fieldLabels[field]||'هذا الحقل'}: راجع القيمة والطول المسموح.`;
   }
   Object.assign(errors,deriveIngredientMetrics(payload.ingredients).errors);
   if(payload.status==='published'){
@@ -61,3 +64,45 @@ export function validateEditor(payload:ReturnType<typeof editorPayload>):{data?:
   return {data:parsed.success&&!Object.keys(errors).length?parsed.data:undefined,errors};
 }
 export function fieldStage(path:string){return path.startsWith('ingredients')?1:path.startsWith('steps')||path==='tasting_notes'?2:['dose_g','water_g','yield_g','temperature_c','time_seconds','grind','beans','roaster'].includes(path)?1:0;}
+
+/** Validation paths must refer to the visible rows, including blank placeholders. */
+export function validateEditorForm(values:EditorValues,ingredients:EditorIngredient[],steps:EditorStep[],status:RecipeInput['status'],recipe?:Pick<Recipe,'id'|'version'>){
+  const result=validateEditor(editorPayload(values,ingredients,steps,status,recipe));
+  const indices={ingredients:ingredients.flatMap((row,index)=>row.name.trim()||row.quantity.trim()?[index]:[]),steps:steps.flatMap((row,index)=>row.instruction.trim()?[index]:[])};
+  const errors:FieldErrors={};
+  for(const [path,message] of Object.entries(result.errors)){
+    if(path==='dose_g'||path==='water_g'){
+      const index=ingredients.findIndex(row=>ingredientMetric(row.name)===path);
+      if(index>=0){errors[`ingredients.${index}.quantity`]=message;continue;}
+    }
+    const match=/^(ingredients|steps)\.(\d+)\.(.+)$/.exec(path);
+    const visibleIndex=match?indices[match[1] as keyof typeof indices][Number(match[2])]:undefined;
+    errors[match&&visibleIndex!==undefined?`${match[1]}.${visibleIndex}.${match[3]}`:path]=message;
+  }
+  return {...result,errors};
+}
+
+export function editorErrorField(path:string,ingredients:EditorIngredient[],steps:EditorStep[],values:EditorValues){
+  const row=/^(ingredients|steps)\.(\d+)\.(.+)$/.exec(path);
+  if(row?.[1]==='ingredients'){
+    const item=ingredients[Number(row[2])];
+    if(item)return `${row[3]==='name'?'ingredient':row[3]}-${item.key}`;
+  }
+  if(row?.[1]==='steps'&&steps[Number(row[2])])return `step-${steps[Number(row[2])].key}`;
+  if(path==='ingredients')return ingredients[0]?`ingredient-${ingredients[0].key}`:'add-ingredient';
+  if(path==='dose_g'||path==='water_g'){
+    const item=ingredients.find(item=>ingredientMetric(item.name)===path);
+    return item?`quantity-${item.key}`:'add-ingredient';
+  }
+  if(path==='steps')return steps[0]?`step-${steps[0].key}`:'add-step';
+  if(path==='time_seconds'){
+    const minutes=editorNumber(values.minutes),seconds=editorNumber(values.seconds);
+    return Number.isInteger(minutes??0)&&(!Number.isInteger(seconds??0)||(seconds??0)>59)?'seconds':'minutes';
+  }
+  return path;
+}
+
+export function restoreEditorRow<T extends {key:string}>(rows:T[],removed:{item:T;index:number}):T[]{
+  if(rows.length>=30||rows.some(row=>row.key===removed.item.key))return rows;
+  const result=[...rows];result.splice(Math.max(0,Math.min(removed.index,result.length)),0,removed.item);return result;
+}

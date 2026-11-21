@@ -62,7 +62,7 @@ export default async function CommunityPage({params,searchParams}:{params:Promis
  if(!unavailable&&!social.available&&((isDiscovery&&feed==='following')||(route==='people'&&peopleView==='following')))redirect(isDiscovery?'/'+route:'/people');
  if(isAuth&&viewer&&['login','signup'].includes(path[1]))redirect(safeAuthNext(value('next')));
  if(isAuth)return <Shell viewer={viewer} active={route} authNext={safeAuthNext(value('next'))}><AuthForm key={`${path[1]}-${value('next')}`} mode={path[1]} returnTo={safeAuthNext(value('next'))} signupEnabled={!unavailable&&publicSignupEnabled()} confirmationError={!!value('error')} oauthError={value('error')==='oauth'}/></Shell>;
- if(route==='')return <Shell viewer={viewer} landing><Landing/></Shell>;
+ if(route==='')return <Shell viewer={viewer} landing><Landing signedIn={!!viewer}/></Shell>;
  if(isLearn&&starter)return <Shell viewer={viewer} active={route}><StarterRecipeDetail recipe={starter} signedIn={!!viewer}/></Shell>;
  if(unavailable)return <Shell viewer={viewer}><section className="connection-state"><Coffee size={40} strokeWidth={1.2}/><span className="eyebrow">GOAT JOURNEY COMMUNITY</span><h1>نحضّر المساحة لتجاربكم.</h1><p>تعذّر تحميل المجتمع الآن. حاول مجددًا بعد قليل.</p><Link className="button" href="/">إعادة المحاولة</Link></section></Shell>;
  return <Shell viewer={viewer} active={route} accountTab={tab} authNext={destination}>

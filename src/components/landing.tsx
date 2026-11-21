@@ -8,7 +8,7 @@ const methods=[
   {name:'Cold Brew',label:'خذ وقتك. غيّر النكهة.',note:'الاستخلاص البارد'},
 ];
 
-export function Landing(){
+export function Landing({signedIn=false}:{signedIn?:boolean}){
   const signupEnabled=publicSignupEnabled();
   return <>
     <section className="landing-hero landing-width" aria-labelledby="landing-title">
@@ -39,12 +39,12 @@ export function Landing(){
       <div className="brew-grid">{methods.map((method,index)=><Link className="brew-card" href={`/explore?method=${encodeURIComponent(method.name)}`} key={method.name}><div className="brew-card-top"><span>{method.note}</span><span dir="ltr">0{index+1}</span></div><h3 dir="ltr">{method.name}</h3><div className="brew-card-bottom"><span>{method.label}</span><ArrowUpLeft size={25}/></div></Link>)}</div>
       <p className="section-caption">استكشف طرق التحضير، واطّلع على الوصفات المنشورة حين يشاركها المجتمع.</p>
     </div></section>
-    <section className="community-story"><div className="landing-width story-inner"><img src="/brand/mark-yellow.svg" alt="" width={225} height={225} loading="lazy"/><div><span className="overline">من فلسطين، لكل من يحب القهوة</span><h2>المعرفة أحلى<br/>لما نتقاسمها.</h2><p>سواء كنت خلف البار كل يوم، أو تحضّر أول فنجان في البيت، فضولك هو البداية. هنا، كل تجربة لها مكان.</p><Link className="button" href={signupEnabled?'/auth/signup':'/explore'}>{signupEnabled?'ابدأ حسابك المجاني':'خذ جولة في المجتمع'}<ArrowUpLeft size={22}/></Link><small>{signupEnabled?'حساب مجاني، وتجارب نتقاسمها. بلا اشتراك أو رسوم.':'التصفّح مفتوح للجميع. إنشاء الحسابات مغلق حاليًا.'}</small></div></div></section>
+    <section className="community-story"><div className="landing-width story-inner"><img src="/brand/mark-yellow.svg" alt="" width={225} height={225} loading="lazy"/><div><span className="overline">من فلسطين، لكل من يحب القهوة</span><h2>المعرفة أحلى<br/>لما نتقاسمها.</h2><p>سواء كنت خلف البار كل يوم، أو تحضّر أول فنجان في البيت، فضولك هو البداية. هنا، كل تجربة لها مكان.</p><Link className="button" href={signedIn?'/recipes/new':signupEnabled?'/auth/signup':'/explore'}>{signedIn?'شارك وصفتك':signupEnabled?'ابدأ حسابك المجاني':'خذ جولة في المجتمع'}<ArrowUpLeft size={22}/></Link><small>{signedIn?'دوّن تجربتك، واحفظها كمسودة أو شاركها مجانًا.':signupEnabled?'حساب مجاني، وتجارب نتقاسمها. بلا اشتراك أو رسوم.':'التصفّح مفتوح للجميع. إنشاء الحسابات مغلق حاليًا.'}</small></div></div></section>
     <section className="landing-section landing-width questions-section" id="questions" aria-labelledby="questions-title"><div><span className="overline">قبل أول فنجان</span><h2 id="questions-title">أسئلة على السريع.</h2></div><div className="question-list">
       <details><summary>لمن هذا المجتمع؟<Plus size={20}/></summary><p>لكل من يحب تجربة القهوة وفهمها: الباريستا، العاملين في المقاهي، وهواة التحضير في البيت. لا تحتاج إلى مستوى محدد لتبدأ التصفّح.</p></details>
       <details><summary>هل أحتاج حسابًا لتصفّح الوصفات؟<Plus size={20}/></summary><p>لا. الوصفات المنشورة متاحة للتصفّح للجميع. تحتاج إلى حساب للمشاركة والتعليق وحفظ وصفاتك المفضلة.</p></details>
       <details><summary>هل التسجيل مجاني؟<Plus size={20}/></summary><p>نعم. إنشاء الحساب ومشاركة الوصفات والتعليق وحفظ المفضّلة مجانًا، دون اشتراك أو بطاقة دفع.</p></details>
-      <details><summary>كيف أنشئ حسابًا؟<Plus size={20}/></summary><p>{signupEnabled?<>أدخل بريدك وكلمة مرور، ثم أكّد بريدك برمز من 6 أرقام يصلك خلال دقائق. بعدها تصبح مساحتك جاهزة. <Link href="/auth/signup">أنشئ حسابك مجانًا</Link></>:'نجهّز استقبال الأعضاء. التسجيل مغلق حاليًا؛ يمكنك التصفّح أو الدخول بحسابك الموجود.'}</p></details>
+      <details><summary>{signedIn?'كيف أشارك وصفة؟':'كيف أنشئ حسابًا؟'}<Plus size={20}/></summary><p>{signedIn?<>أضف المقادير والأداة وخطوات التحضير. يمكنك حفظ تجربتك كمسودة خاصة أو نشرها عندما تصبح جاهزة. <Link href="/recipes/new">اكتب وصفتك</Link></>:signupEnabled?<>أدخل بريدك وكلمة مرور، ثم أكّد بريدك برمز من 6 أرقام يصلك خلال دقائق. بعدها تصبح مساحتك جاهزة. <Link href="/auth/signup">أنشئ حسابك مجانًا</Link></>:'نجهّز استقبال الأعضاء. التسجيل مغلق حاليًا؛ يمكنك التصفّح أو الدخول بحسابك الموجود.'}</p></details>
     </div></section>
   </>;
 }

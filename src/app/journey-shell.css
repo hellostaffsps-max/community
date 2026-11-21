@@ -11,12 +11,13 @@
 .journey-desktop-nav>a[aria-current=page]{font-weight:700}
 .journey-desktop-nav>a[aria-current=page]:after{content:'';position:absolute;bottom:3px;inset-inline:0;height:3px;border-radius:2px;background:var(--yellow)}
 .journey-header-actions{display:flex;align-items:center;gap:22px;margin-inline-start:auto;flex-shrink:0;font-size:14px}
-.journey-header-actions .button{min-height:43px;padding:9px 20px;font-size:13px}
-.journey-profile-link{width:40px;height:40px;display:grid;place-items:center;background:var(--offwhite);border:1px solid var(--line);border-radius:50%}
-.journey-login-link{display:flex;align-items:center;min-height:44px}
+.journey-header-actions .button{min-height:44px;padding:9px 20px;font-size:13px}
+.journey-profile-link{width:44px;height:44px;display:grid;place-items:center;background:var(--offwhite);border:1px solid var(--line);border-radius:50%}
+.journey-login-link{display:flex;align-items:center;justify-content:center;min-height:44px;min-width:44px}
+.journey-app>.skip-link,.journey-auth-shell>.skip-link{z-index:100}
 .journey-content{max-width:1240px;margin-inline:auto;padding:0 40px 48px;min-height:calc(100dvh - 180px)}
 .journey-footer{display:flex;align-items:center;gap:24px;max-width:1160px;margin:0 auto;padding:24px 0 30px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
-.journey-footer>a{display:flex;align-items:center;gap:6px;min-height:40px}
+.journey-footer>a{display:flex;align-items:center;gap:6px;min-height:44px}
 .journey-footer>span{margin-inline-start:auto;font-size:10px;letter-spacing:.08em}
 .journey-bottom-nav{display:none}
 .journey-focus .journey-content{max-width:1160px;min-height:100dvh}
@@ -29,14 +30,14 @@
 .journey-back:hover{background:var(--offwhite)}
 .journey-auth-main{flex:1;width:100%;max-width:510px;padding:20px 24px 40px;margin:auto}
 .journey-auth-footer{display:flex;flex-wrap:wrap;justify-content:center;gap:10px 20px;padding:20px 24px 32px;font-size:12px;color:var(--muted)}
-.journey-auth-footer a{text-decoration:underline;text-underline-offset:4px}
+.journey-auth-footer a{display:inline-flex;align-items:center;min-height:44px;text-decoration:underline;text-underline-offset:4px}
 .journey-app .empty{background:#faf9f6;border:1px solid var(--line);border-radius:14px}
 .journey-app .pagination{padding-block:24px}
 @media(max-width:1100px){.journey-header-inner{gap:25px;padding-inline:28px}.journey-desktop-nav{gap:20px;font-size:12px}.journey-content{padding-inline:28px}.journey-footer{margin-inline:28px}}
 @media(max-width:960px){
  .journey-header-inner{height:74px;gap:18px;padding-inline:22px}.journey-desktop-nav{display:none}
  .journey-header .brand-lockup img{width:112px;height:38px}.journey-header .brand-product{font-size:6px}
- .journey-header-actions{gap:18px}.journey-header-actions .button{font-size:12px;padding:8px 16px;min-height:40px}.journey-header-create{display:none}
+ .journey-header-actions{gap:18px}.journey-header-actions .button{font-size:12px;padding:8px 16px;min-height:44px}.journey-header-create{display:none}
  .journey-content{padding-inline:22px;padding-bottom:36px}.journey-footer{margin-inline:22px;padding-bottom:110px;flex-wrap:wrap;gap:8px 20px}
  .journey-footer>span{width:100%;font-size:9px}
  .journey-bottom-nav{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));position:fixed;inset-inline:0;bottom:0;z-index:30;background:#fffffff7;border-top:1px solid #e8e7e2;backdrop-filter:blur(16px);padding:8px 8px max(10px,env(safe-area-inset-bottom));}

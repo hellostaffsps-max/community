@@ -2,7 +2,7 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Recipe,Profile,Comment,Report,Viewer } from './types';
 import { HttpError } from './http';
-export const recipeSelect='*, profiles!recipes_owner_id_fkey(id,username,display_name,city,avatar_path), recipe_images(object_path,alt_text)';
+export const recipeSelect='*, profiles!recipes_owner_id_fkey(id,username,display_name,bio,city,avatar_path), recipe_images(object_path,alt_text)';
 export async function viewer(client:SupabaseClient):Promise<Viewer|null>{
   const {data:{user},error}=await client.auth.getUser();
   if(error||!user)return null;
@@ -15,13 +15,29 @@ export async function requireUser(client:SupabaseClient){
   if(!user.email_confirmed_at)throw new HttpError(403,'تحقق من بريدك أولًا.');
   return user;
 }
-export async function explore(client:SupabaseClient,query:string,method:string,page:number,owner?:string){
+export async function explore(client:SupabaseClient,query:string,method:string,page:number,owner?:string,followingIds?:string[]){
+  if(followingIds&&followingIds.length===0)return {recipes:[],hasMore:false,total:0};
   let request=client.from('recipes').select(recipeSelect,{count:'exact'}).eq('status','published').is('hidden_at',null).order('created_at',{ascending:false}).order('id').range(page*12,page*12+11);
   if(query.trim())request=request.textSearch('search_document',query.slice(0,120),{type:'websearch',config:'simple'});
   if(method)request=request.eq('method',method);
   if(owner)request=request.eq('owner_id',owner);
+  if(followingIds)request=request.in('owner_id',followingIds);
   const {data,error,count}=await request.returns<Recipe[]>();if(error)throw error;
   return {recipes:data||[],hasMore:(count||0)>(page+1)*12,total:count||0};
+}
+export async function savedRecipeIds(client:SupabaseClient,userId:string|undefined,recipes:Recipe[]){
+  if(!userId||!recipes.length)return [];
+  const {data,error}=await client.from('bookmarks').select('recipe_id').eq('user_id',userId).in('recipe_id',recipes.map(recipe=>recipe.id));
+  if(error)throw error;return (data||[]).map(row=>row.recipe_id as string);
+}
+export async function people(client:SupabaseClient,query:string,page:number,followingIds?:string[]){
+  if(followingIds&&followingIds.length===0)return {members:[],hasMore:false,total:0};
+  let request=client.from('profiles').select('id,username,display_name,bio,city,workplace,country_code,avatar_path',{count:'exact'}).order('display_name').order('id').range(page*24,page*24+23);
+  if(!followingIds)request=request.neq('display_name','عضو جديد');
+  if(query.trim())request=request.ilike('display_name',`%${query.trim().slice(0,120).replace(/[\\%_]/g,'\\$&')}%`);
+  if(followingIds)request=request.in('id',followingIds);
+  const {data,error,count}=await request.returns<Profile[]>();if(error)throw error;
+  return {members:data||[],hasMore:(count||0)>(page+1)*24,total:count||0};
 }
 export async function detail(client:SupabaseClient,id:string,userId?:string){
   const {data,error}=await client.from('recipes').select(`${recipeSelect},recipe_ingredients(name,quantity,unit,position),recipe_steps(instruction,position)`).eq('id',id).maybeSingle();

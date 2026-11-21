@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import {Compass,Bookmark,Plus,UserRound,UserPlus,LogIn,ArrowUpLeft,House,BookOpen,FilePenLine,Settings2,ChevronLeft,ShieldCheck,Search} from 'lucide-react';
+import {Compass,Bookmark,Plus,UserRound,UserPlus,LogIn,ArrowUpLeft,House,BookOpen,FilePenLine,Settings2,ChevronLeft,ShieldCheck,Search,UsersRound} from 'lucide-react';
 import type {ReactNode} from 'react';
 import type {Viewer} from '@/lib/types';
 import {publicSignupEnabled} from '@/lib/env';
@@ -18,11 +18,12 @@ function MobileNavigation({viewer,signupEnabled,active,landing,accountTab,authNe
       <AppNavLink href="/explore" active={exploring}><Compass size={21}/><span>اكتشف</span></AppNavLink>
       <AppNavLink href="/account?tab=saved" active={active==='account'&&accountTab==='saved'}><Bookmark size={21}/><span>محفوظاتي</span></AppNavLink>
       <AppNavLink href="/recipes/new" active={editing} className="mobile-create"><span className="mobile-create-icon"><Plus size={22}/></span><span>وصفة جديدة</span></AppNavLink>
-      <AppNavLink href="/account?tab=drafts" active={active==='account'&&accountTab==='drafts'}><FilePenLine size={21}/><span>مسوداتي</span></AppNavLink>
+      <AppNavLink href="/people" active={active==='people'||active.startsWith('members/')}><UsersRound size={21}/><span>أهل القهوة</span></AppNavLink>
       <AppNavLink href="/account" active={active==='account'&&['published','profile'].includes(accountTab)}><UserRound size={21}/><span>حسابي</span></AppNavLink>
     </>:<>
       <AppNavLink href="/" active={landing}><House size={21}/><span>الرئيسية</span></AppNavLink>
       <AppNavLink href="/explore" active={exploring}><Compass size={21}/><span>الوصفات</span></AppNavLink>
+      <AppNavLink href="/people" active={active==='people'||active.startsWith('members/')}><UsersRound size={21}/><span>أهل القهوة</span></AppNavLink>
       {signupEnabled&&<AppNavLink href={authHref('signup',authNext)} active={active==='auth/signup'||active==='auth/verify'} className="mobile-join"><UserPlus size={21}/><span>انضم مجانًا</span></AppNavLink>}
       <AppNavLink href={authHref('login',authNext)} active={['auth/login','auth/forgot','auth/reset'].includes(active)}><LogIn size={21}/><span>دخول</span></AppNavLink>
     </>}
@@ -37,14 +38,16 @@ export function Shell({children,viewer=null,landing=false,active='',accountTab='
   if(!landing&&active&&!active.startsWith('auth/')){
     const editing=active==='recipes/new'||active.endsWith('/edit');
     const exploring=active==='explore'||active.startsWith('learn/');
-    const title=active==='explore'?'استكشف الوصفات':active.startsWith('learn/')?'دليل التحضير':editing?'استوديو الوصفات':active==='account'?'دفتر تجاربك':active==='moderation'?'مراجعة المجتمع':active.startsWith('members/')?'من أهل القهوة':'حكاية فنجان';
+    const title=active==='explore'?'دفاتر المجتمع':active==='people'?'أهل القهوة':active.startsWith('learn/')?'دليل التحضير':editing?'استوديو الوصفات':active==='account'?'دفتر تجاربك':active==='moderation'?'مراجعة المجتمع':active.startsWith('members/')?'من أهل القهوة':'حكاية فنجان';
     const sections=viewer?[
-      {href:'/explore',label:'اكتشف الوصفات',icon:Compass,selected:exploring},
+      {href:'/explore',label:'دفاتر المجتمع',icon:Compass,selected:exploring},
+      {href:'/people',label:'أهل القهوة',icon:UsersRound,selected:active==='people'||active.startsWith('members/')},
       {href:'/account',label:'وصفاتي',icon:BookOpen,selected:active==='account'&&accountTab==='published'},
       {href:'/account?tab=saved',label:'المحفوظات',icon:Bookmark,selected:active==='account'&&accountTab==='saved'},
       {href:'/account?tab=drafts',label:'المسودات',icon:FilePenLine,selected:active==='account'&&accountTab==='drafts'},
     ]:[
-      {href:'/explore',label:'اكتشف الوصفات',icon:Compass,selected:exploring},
+      {href:'/explore',label:'دفاتر المجتمع',icon:Compass,selected:exploring},
+      {href:'/people',label:'أهل القهوة',icon:UsersRound,selected:active==='people'||active.startsWith('members/')},
       {href:'/',label:'عن جوت جيرني',icon:House,selected:false},
     ];
     return <div className="community-app">

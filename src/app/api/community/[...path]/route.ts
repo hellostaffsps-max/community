@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase/server';
 import { assertOrigin,jsonBody,boundedBody,json,failure,HttpError } from '@/lib/http';
 import { recipeSchema,profileSchema,commentSchema,reportSchema,uuid,imageType } from '@/lib/validation';
 import { requireUser } from '@/lib/data';
+import {setCommunityFollow} from '@/lib/community-social';
 
 type Context={params:Promise<{path:string[]}>};
 async function mutate(request:Request,context:Context){
@@ -12,6 +13,10 @@ async function mutate(request:Request,context:Context){
     const {path}=await context.params;const [resource,id]=path;
     if(path.length>2)throw new HttpError(404,'الطلب غير موجود.');
     const method=request.method;
+    if(resource==='follows'&&id&&['POST','DELETE'].includes(method)){
+      uuid.parse(id);if(method==='POST')z.object({}).strict().parse(await jsonBody(request));
+      return json(await setCommunityFollow(client,user.id,id,method==='POST'));
+    }
     if(resource==='images'&&method==='POST'){
       const bytes=await boundedBody(request,5*1024*1024+65536);
       const form=await new Response(bytes,{headers:{'content-type':request.headers.get('content-type')||''}}).formData();

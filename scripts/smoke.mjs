@@ -14,7 +14,7 @@ function localUrl(path){
 async function request(path,options={}){
   // Cold Next development routes may compile before sending a response.
   // Inspect redirects explicitly so this script never follows one off localhost.
-  return fetch(localUrl(path),{...options,redirect:'manual',signal:AbortSignal.timeout(90000)});
+  return fetch(localUrl(path),{...options,credentials:'omit',redirect:'manual',signal:AbortSignal.timeout(90000)});
 }
 function decodeHtml(value){
   return value.replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#(?:x27|39);/gi,"'");
@@ -58,6 +58,23 @@ assert.deepEqual(starterLinks(discoveryHtml),[
   '/learn/aeropress-upright','/learn/french-press-basics','/learn/v60-first-cup'
 ]);
 console.log('PASS: discovery exposes the three labeled starter guides');
+
+const directory=await request('/people');
+assert.equal(directory.status,200);
+const directoryHtml=await directory.text();
+assert.match(directoryHtml,/<h1[^>]*>أهل القهوة\.<\/h1>/);
+assert.match(directoryHtml,/id="people-search"/);
+assert.match(directoryHtml,/ابحث باسم الشخص/);
+assert.ok(links(discoveryHtml).includes('/people'),'Discovery must expose the real people directory');
+console.log('PASS: public people directory and accessible member search render');
+
+for(const destination of ['/explore?feed=following','/people?view=following']){
+  const gated=await request(destination);
+  const target=await redirectTarget(gated);
+  assert.equal(target.pathname,'/auth/login');
+  assert.equal(target.searchParams.get('next'),destination,'Following login must retain the selected destination');
+}
+console.log('PASS: signed-out following feed and directory redirect to login with continuation');
 
 const filtered=await request('/explore?method=V60');
 assert.equal(filtered.status,200);
@@ -112,6 +129,10 @@ console.log('PASS: cross-origin mutation rejected');
 const anonymous=await request('/api/community/recipes',{method:'POST',headers:{origin,'content-type':'application/json'},body:'{}'});
 assert.equal(anonymous.status,401);
 console.log('PASS: anonymous mutation rejected');
+// No cookies or credentials are sent. A synthetic UUID avoids targeting a real member.
+const anonymousFollow=await request('/api/community/follows/00000000-0000-4000-8000-000000000001',{method:'POST',headers:{origin,'content-type':'application/json'},body:'{}'});
+assert.equal(anonymousFollow.status,401);
+console.log('PASS: anonymous follow request rejected before any member mutation');
 const invalidImage=await request('/api/media?bucket=avatars&path=../../secret');
 assert.equal(invalidImage.status,400);
 console.log('PASS: invalid image path rejected');

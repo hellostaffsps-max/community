@@ -24,7 +24,7 @@ afterAll(async()=>db.close());
 
 describe('private persistent member following',()=>{
   it('matches the CLI-created migration and enables RLS',async()=>{
-    expect(readFileSync('supabase/migrations/20261121004429_community_member_follows.sql','utf8')).toBe(readFileSync('supabase/community-social.sql','utf8'));
+    expect(readFileSync('supabase/migrations/20261121014640_community_member_follows.sql','utf8')).toBe(readFileSync('supabase/community-social.sql','utf8'));
     expect((await db.query<{relrowsecurity:boolean}>("select relrowsecurity from pg_class where oid='public.member_follows'::regclass")).rows[0].relrowsecurity).toBe(true);
   });
   it('persists per-account follows across requests and duplicate inserts are idempotent',async()=>{

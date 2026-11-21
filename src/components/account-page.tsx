@@ -6,36 +6,51 @@ import {accountNeedsSetup,hasDefaultDisplayName,hasGeneratedUsername} from '@/li
 import {Avatar,Cards} from './shared';
 import {ProfileForm,SignOut} from './account';
 
-const sections=[{key:'published',label:'وصفاتي',icon:BookOpen},{key:'drafts',label:'المسودات',icon:FilePenLine},{key:'saved',label:'المحفوظات',icon:Bookmark},{key:'profile',label:'تعديل الملف',icon:Settings2}];
+const sections=[{key:'published',label:'وصفاتي',icon:BookOpen},{key:'drafts',label:'المسودات',icon:FilePenLine},{key:'saved',label:'المحفوظات',icon:Bookmark},{key:'profile',label:'الإعدادات',icon:Settings2}];
 const copy:Record<string,{title:string;description:string;emptyTitle:string;emptyText:string}>={
-  published:{title:'تجارب شاركتها.',description:'وصفاتك المنشورة، من دفترك إلى مجتمع القهوة.',emptyTitle:'لكل وصفة بداية.',emptyText:'شارك تجربتك الأولى: المقادير، الخطوات، والتفاصيل التي صنعت الفرق.'},
-  drafts:{title:'على مهل، حتى تضبط.',description:'مسوداتك مساحة خاصة للتجربة، لا يراها أحد غيرك.',emptyTitle:'دفترك جاهز للفكرة القادمة.',emptyText:'ابدأ وصفة واحفظها كمسودة. ارجع إليها عندما تصبح جاهزة للمشاركة.'},
-  saved:{title:'للفنجان القادم.',description:'مجموعة خاصة من الوصفات التي ألهمتك وأردت العودة إليها.',emptyTitle:'احتفظ بما يلهمك.',emptyText:'تصفّح المجتمع، واضغط «احفظ الوصفة» لتجد تجاربك المفضّلة هنا.'},
+  published:{title:'وصفاتي',description:'الوصفات التي شاركتها مع المجتمع.',emptyTitle:'وصفتك الأولى تبدأ هنا.',emptyText:'شارك المقادير والخطوات، وكل تفصيل جعل الفنجان مختلفًا.'},
+  drafts:{title:'المسودات',description:'تجاربك قيد التحضير.',emptyTitle:'مساحة للتجربة.',emptyText:'احفظ وصفتك كمسودة، وارجع إليها عندما تصبح جاهزة.'},
+  saved:{title:'المحفوظات',description:'وصفات تريد العودة إليها.',emptyTitle:'احفظ ما يلهمك.',emptyText:'تصفّح الوصفات واحفظ ما ترغب في تجربته لتجده هنا.'},
 };
 
 export function AccountPage({profile,recipes,tab,pagination}:{profile:Profile;recipes:Recipe[];tab:string;pagination?:ReactNode}){
-  const content=copy[tab]||copy.published;const selected=sections.find(s=>s.key===tab)||sections[0];const Icon=selected.icon;
+  const content=copy[tab]||copy.published;const selected=sections.find(section=>section.key===tab)||sections[0];const Icon=selected.icon;
   const needsSetup=accountNeedsSetup(profile);const generatedUsername=hasGeneratedUsername(profile.username);
-  return <div className="member-workspace">
-    <section className="account-identity"><div className="identity-person"><Avatar profile={profile}/><div><span className="overline">مساحتك في Goat Journey</span><h1>{hasDefaultDisplayName(profile.display_name)?'أهلًا بك بين أهل القهوة.':profile.display_name}</h1><div className="identity-meta">{generatedUsername?<span>دفتر تجاربك يبدأ من هنا</span>:<span dir="ltr">@{profile.username}</span>}{profile.city&&<span><MapPin size={14}/>{profile.city}</span>}</div></div></div><Link className="button" href={needsSetup?'/account?tab=profile':'/recipes/new'}>{needsSetup?<><UserRound size={19}/>عرّفنا باسمك</>:<><Plus size={19}/>وصفة جديدة</>}</Link></section>
-    {needsSetup&&tab==='published'&&<section className="member-welcome" aria-labelledby="member-welcome-title">
-      <div className="member-welcome-heading"><span className="overline">بداية رحلتك</span><h2 id="member-welcome-title">خلّي المساحة تشبهك.</h2><p>اختر اسمك، خذ فكرة لفنجانك القادم، ودوّن أول تجربة على راحتك.</p></div>
-      <ol className="member-first-steps">
-        <li><span className="member-step-icon"><UserRound size={22}/></span><div><span className="member-step-number">01 / اسمك في المجتمع</span><h3>الشخص وراء الفنجان</h3><p>اختر اسم العرض واسم المستخدم. الصورة والنبذة اختياريتان.</p><Link className="button small" href="/account?tab=profile">أكمل ملفك<ArrowUpLeft size={16}/></Link></div></li>
-        <li><span className="member-step-icon"><Compass size={22}/></span><div><span className="member-step-number">02 / فكرة للتجربة</span><h3>ابدأ بما تحب تحضيره</h3><p>تصفّح طرق التحضير، واختر وصفة تبدأ منها.</p><Link className="quiet-link" href="/explore">استكشف الوصفات<ArrowUpLeft size={16}/></Link></div></li>
-        <li><span className="member-step-icon"><FilePenLine size={22}/></span><div><span className="member-step-number">03 / أول صفحة في دفترك</span><h3>جرّب، ثم شارك بطريقتك</h3><p>ابدأ وصفة أو احتفظ بها كمسودة خاصة حتى تكون جاهزة.</p><Link className="quiet-link" href="/recipes/new">ابدأ تجربتك<ArrowUpLeft size={16}/></Link></div></li>
+  return <div className={'journey-profile journey-account journey-account-'+tab}>
+    <header className="journey-profile-header">
+      <div className="journey-profile-avatar"><Avatar profile={profile}/></div>
+      <h1>{hasDefaultDisplayName(profile.display_name)?'أهلًا بك بين أهل القهوة.':profile.display_name}</h1>
+      {!generatedUsername&&<p className="journey-profile-handle" dir="ltr">@{profile.username}</p>}
+      {profile.bio&&<p className="journey-profile-bio preserve">{profile.bio}</p>}
+      {profile.city&&<p className="journey-profile-location"><MapPin size={14}/>{profile.city}</p>}
+      {needsSetup&&<p className="journey-profile-setup">اختر اسمك ليعرف المجتمع صاحب الوصفة.</p>}
+      <div className="journey-profile-actions">
+        <Link className="button secondary small" href="/account?tab=profile"><Settings2 size={16}/>{needsSetup?'أكمل ملفك':'تعديل الملف'}</Link>
+        <Link className="button small" href="/recipes/new"><Plus size={17}/>وصفة جديدة</Link>
+        {!generatedUsername&&<Link className="journey-profile-public-link" href={'/members/'+profile.username}>ملفي العام<ArrowUpLeft size={15}/></Link>}
+      </div>
+    </header>
+
+    {needsSetup&&tab==='published'&&<section className="journey-welcome" aria-labelledby="journey-welcome-title">
+      <div className="journey-welcome-heading"><h2 id="journey-welcome-title">ابدأ من هنا</h2><p>خطوات صغيرة لمساحة تشبهك.</p></div>
+      <ol>
+        <li><UserRound size={20}/><div><strong>عرّفنا باسمك</strong><span>الصورة والنبذة اختياريتان.</span></div><Link href="/account?tab=profile" aria-label="أكمل اسمك وملفك">أكمل ملفك<ArrowUpLeft size={16}/></Link></li>
+        <li><Compass size={20}/><div><strong>خذ فكرة لفنجانك</strong><span>اكتشف وصفات أهل القهوة.</span></div><Link href="/explore">استكشف<ArrowUpLeft size={16}/></Link></li>
+        <li><FilePenLine size={20}/><div><strong>دوّن أول تجربة</strong><span>يمكنك حفظها كمسودة خاصة.</span></div><Link href="/recipes/new">ابدأ وصفة<ArrowUpLeft size={16}/></Link></li>
       </ol>
     </section>}
-    <div className="account-layout">
-      <aside className="account-sidebar"><span className="sidebar-label">دفتر تجاربك</span><nav aria-label="أقسام الحساب">{sections.map(({key,label,icon:SectionIcon})=><Link href={`/account?tab=${key}`} key={key} aria-current={tab===key?'page':undefined}><SectionIcon size={20}/><span>{label}</span><ArrowUpLeft size={15} className="sidebar-arrow"/></Link>)}</nav><div className="account-sidebar-bottom">{!generatedUsername&&<Link href={`/members/${profile.username}`} className="quiet-link">ملفي العام<ArrowUpLeft size={16}/></Link>}<SignOut/></div></aside>
-      <div className="account-content">
-        {tab==='profile'?<ProfileForm profile={profile}/>:<>
-          <div className="account-content-heading"><span className="section-icon"><Icon size={22}/></span><div><h2>{content.title}</h2><p>{content.description}</p></div></div>
-          {tab!=='published'&&<div className="privacy-caption"><ShieldCheck size={16}/>{tab==='saved'?'المحفوظات خاصة بك. لا تظهر الوصفات المحذوفة أو المخفية.':'المسودات وصورها خاصة بك حتى تختار نشرها.'}</div>}
-          {recipes.length?<Cards recipes={recipes}/>:<section className="account-empty"><Icon size={38} strokeWidth={1.4}/><h3>{content.emptyTitle}</h3><p>{content.emptyText}</p><div className="account-empty-actions"><Link className="button" href={tab==='saved'?'/explore':'/recipes/new'}>{tab==='saved'?'استكشف الوصفات':'ابدأ وصفة'}<ArrowUpLeft size={18}/></Link>{tab!=='saved'&&<Link className="quiet-link" href="/explore">خذ فكرة من وصفة<Compass size={17}/></Link>}</div></section>}
-          {pagination}
-        </>}
-      </div>
+
+    <nav className="journey-profile-tabs" aria-label="أقسام الحساب">
+      {sections.map(({key,label,icon:SectionIcon})=><Link href={'/account?tab='+key} key={key} aria-current={tab===key?'page':undefined}><SectionIcon size={18}/><span>{label}</span></Link>)}
+    </nav>
+    <div className="journey-profile-content">
+      {tab==='profile'?<ProfileForm profile={profile}/>:<>
+        <div className="journey-profile-section-title"><div><h2>{content.title}</h2><p>{content.description}</p></div></div>
+        {tab!=='published'&&<p className="journey-profile-private"><ShieldCheck size={14}/>{tab==='saved'?'المحفوظات خاصة بك. لا تظهر الوصفات المحذوفة أو المخفية.':'هذه المسودات وصورها لا يراها أحد غيرك.'}</p>}
+        {recipes.length?<Cards recipes={recipes}/>:<section className="journey-profile-empty"><Icon size={34} strokeWidth={1.4}/><h3>{content.emptyTitle}</h3><p>{content.emptyText}</p><Link className="button small" href={tab==='saved'?'/explore':'/recipes/new'}>{tab==='saved'?'استكشف الوصفات':'ابدأ وصفة'}<ArrowUpLeft size={17}/></Link></section>}
+        {pagination}
+      </>}
     </div>
+    <div className="journey-account-session"><SignOut/></div>
   </div>;
 }

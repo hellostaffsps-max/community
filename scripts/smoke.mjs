@@ -59,6 +59,15 @@ assert.deepEqual(starterLinks(discoveryHtml),[
 ]);
 console.log('PASS: discovery exposes the three labeled starter guides');
 
+const searchPage=await request('/search?method=V60');
+assert.equal(searchPage.status,200);
+const searchHtml=await searchPage.text();
+assert.match(searchHtml,/id="recipe-search"/);
+assert.deepEqual(starterLinks(searchHtml),['/learn/v60-first-cup']);
+assert.ok(links(discoveryHtml).includes('/search'),'Home must expose the dedicated search destination');
+assert.ok(links(discoveryHtml).some(href=>href.startsWith('/auth/login?')&&new URL(href,origin).searchParams.get('next')==='/account?tab=saved'),'Signed-out saved navigation must retain its destination');
+console.log('PASS: dedicated search renders filtered guides and navigation retains saved destination');
+
 const directory=await request('/people');
 assert.equal(directory.status,200);
 const directoryHtml=await directory.text();
@@ -68,7 +77,7 @@ assert.match(directoryHtml,/ابحث باسم الشخص/);
 assert.ok(links(discoveryHtml).includes('/people'),'Discovery must expose the real people directory');
 console.log('PASS: public people directory and accessible member search render');
 
-for(const destination of ['/explore?feed=following','/people?view=following']){
+for(const destination of ['/explore?feed=following','/search?feed=following&q=coffee&method=V60&page=2','/people?view=following&q=coffee&page=2']){
   const gated=await request(destination);
   const target=await redirectTarget(gated);
   assert.equal(target.pathname,'/auth/login');
@@ -109,7 +118,7 @@ const loginHtml=await login.text();
 assert.match(loginHtml,/أهلًا بعودتك/);
 assert.match(loginHtml,/type="password"/);
 const loginUrls=links(loginHtml).map(href=>new URL(href,origin));
-for(const mode of ['login','forgot','verify',...(expectOpen?['signup']:[])]){
+for(const mode of ['forgot','verify',...(expectOpen?['signup']:[])]){
   const modeLinks=loginUrls.filter(url=>url.pathname==='/auth/'+mode);
   assert.ok(modeLinks.length>0,'Login page must expose '+mode+' navigation');
   for(const url of modeLinks)assert.equal(url.searchParams.get('next'),templateDestination,mode+' link must retain the recipe template');

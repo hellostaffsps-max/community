@@ -33,9 +33,9 @@ function Pagination({page,more,base,query}:{page:number;more?:boolean;base:strin
 export default async function CommunityPage({params,searchParams}:{params:Promise<{slug?:string[]}>;searchParams:Promise<Record<string,string|string[]|undefined>>}){
  const path=(await params).slug||[];const search=await searchParams;const value=(key:string)=>typeof search[key]==='string'?search[key] as string:'';const page=Math.min(1000,Math.max(0,(Number.parseInt(value('page'),10)||1)-1));const q=value('q').slice(0,120);const method=value('method').slice(0,80);const tab=['drafts','saved','profile'].includes(value('tab'))?value('tab'):'published';
  const feed=value('feed')==='following'?'following':'latest';const peopleView=value('view')==='following'?'following':'all';
- const route=path.join('/');const isAuth=path[0]==='auth'&&path.length===2&&['login','signup','forgot','reset','resend','verify'].includes(path[1]);const isNew=route==='recipes/new';const isDetail=path[0]==='recipes'&&path.length===2&&!isNew;const isEdit=path[0]==='recipes'&&path.length===3&&path[2]==='edit';const isMember=path[0]==='members'&&path.length===2;
+ const route=path.join('/');const isDiscovery=route==='explore'||route==='search';const isAuth=path[0]==='auth'&&path.length===2&&['login','signup','forgot','reset','resend','verify'].includes(path[1]);const isNew=route==='recipes/new';const isDetail=path[0]==='recipes'&&path.length===2&&!isNew;const isEdit=path[0]==='recipes'&&path.length===3&&path[2]==='edit';const isMember=path[0]==='members'&&path.length===2;
  const isLearn=path[0]==='learn'&&path.length===2;const starter=isLearn?getStarterRecipe(path[1]):undefined;const template=isNew&&value('template')?getStarterRecipe(value('template')):undefined;
- if(!(route===''||route==='explore'||route==='people'||route==='account'||route==='moderation'||isAuth||isNew||isDetail||isEdit||isMember||isLearn))notFound();
+ if(!(route===''||isDiscovery||route==='people'||route==='account'||route==='moderation'||isAuth||isNew||isDetail||isEdit||isMember||isLearn))notFound();
  if((isLearn&&!starter)||(isNew&&value('template')&&!template))notFound();
  if(route===''&&['q','method','page'].some(key=>key in search))redirect('/explore?'+new URLSearchParams({q,method,page:String(page+1)}));
  if((isDetail||isEdit)&&!uuid.safeParse(path[1]).success)notFound();
@@ -43,8 +43,8 @@ export default async function CommunityPage({params,searchParams}:{params:Promis
  try{
    if(!connection())throw new Error('connection_not_configured');const client=await supabase();viewer=await getViewer(client);
    if(!isAuth){
-     if(route==='explore'||route==='people'||isMember||isDetail)social=await getCommunitySocial(client,viewer?.id);
-     if(route==='explore'){const [recipes,members]=await Promise.all([explore(client,q,method,page,undefined,feed==='following'?social.followedIds:undefined),people(client,'',0)]);data={...recipes,members:members.members.slice(0,4)};}
+     if(isDiscovery||route==='people'||isMember||isDetail)social=await getCommunitySocial(client,viewer?.id);
+     if(isDiscovery){const [recipes,members]=await Promise.all([explore(client,q,method,page,undefined,feed==='following'?social.followedIds:undefined),people(client,'',0)]);data={...recipes,members:members.members.slice(0,4)};}
      else if(route==='people')data=await people(client,q,page,peopleView==='following'?social.followedIds:undefined);
      else if(isDetail||isEdit){data=await detail(client,path[1],viewer?.id);if(isEdit&&(data.recipe?.owner_id!==viewer?.id||data.recipe?.hidden_at))denied=true;}
      else if(route==='account'&&viewer)data=await account(client,viewer.id,tab,page);
@@ -55,18 +55,18 @@ export default async function CommunityPage({params,searchParams}:{params:Promis
    }
  }catch(error){if(error instanceof HttpError&&error.status===404)missing=true;else{unavailable=true;console.error(JSON.stringify({event:'page_data_unavailable',code:(error as {code?:string}).code||'connection'}));}}
  if(missing)notFound();
- const destinationQuery=new URLSearchParams();if(isNew&&template)destinationQuery.set('template',template.slug);if(route==='account'&&value('tab'))destinationQuery.set('tab',tab);if(route==='explore'&&feed==='following')destinationQuery.set('feed','following');if(route==='people'&&peopleView==='following')destinationQuery.set('view','following');
+ const destinationQuery=new URLSearchParams();if(isNew&&template)destinationQuery.set('template',template.slug);if(route==='account'&&value('tab'))destinationQuery.set('tab',tab);if(isDiscovery){if(feed==='following')destinationQuery.set('feed','following');if(q)destinationQuery.set('q',q);if(method)destinationQuery.set('method',method);if(page>0)destinationQuery.set('page',String(page+1));}if(route==='people'){if(peopleView==='following')destinationQuery.set('view','following');if(q)destinationQuery.set('q',q);if(page>0)destinationQuery.set('page',String(page+1));}
  const destination=`/${route}${destinationQuery.size?`?${destinationQuery}`:''}`;
- if((isNew||isEdit||route==='account'||route==='moderation'||route==='auth/reset'||(route==='explore'&&feed==='following')||(route==='people'&&peopleView==='following'))&&!viewer&&!unavailable)redirect(authHref('login',destination));
+ if((isNew||isEdit||route==='account'||route==='moderation'||route==='auth/reset'||(isDiscovery&&feed==='following')||(route==='people'&&peopleView==='following'))&&!viewer&&!unavailable)redirect(authHref('login',destination));
  if((route==='moderation'&&!viewer?.moderator)||denied)return <Shell viewer={viewer}><div className="empty"><h1>هذه الصفحة غير متاحة لحسابك.</h1><Link className="button" href="/">العودة للمجتمع</Link></div></Shell>;
- if(!unavailable&&!social.available&&((route==='explore'&&feed==='following')||(route==='people'&&peopleView==='following')))redirect(route==='explore'?'/explore':'/people');
+ if(!unavailable&&!social.available&&((isDiscovery&&feed==='following')||(route==='people'&&peopleView==='following')))redirect(isDiscovery?'/'+route:'/people');
  if(isAuth&&viewer&&['login','signup'].includes(path[1]))redirect(safeAuthNext(value('next')));
- if(isAuth)return <Shell viewer={viewer} active={route} authNext={safeAuthNext(value('next'))}><AuthForm key={`${path[1]}-${value('next')}`} mode={path[1]} returnTo={safeAuthNext(value('next'))} signupEnabled={!unavailable&&publicSignupEnabled()} confirmationError={!!value('error')}/></Shell>;
+ if(isAuth)return <Shell viewer={viewer} active={route} authNext={safeAuthNext(value('next'))}><AuthForm key={`${path[1]}-${value('next')}`} mode={path[1]} returnTo={safeAuthNext(value('next'))} signupEnabled={!unavailable&&publicSignupEnabled()} confirmationError={!!value('error')} oauthError={value('error')==='oauth'}/></Shell>;
  if(route==='')return <Shell viewer={viewer} landing><Landing/></Shell>;
  if(isLearn&&starter)return <Shell viewer={viewer} active={route}><StarterRecipeDetail recipe={starter} signedIn={!!viewer}/></Shell>;
  if(unavailable)return <Shell viewer={viewer}><section className="connection-state"><Coffee size={40} strokeWidth={1.2}/><span className="eyebrow">GOAT JOURNEY COMMUNITY</span><h1>نحضّر المساحة لتجاربكم.</h1><p>تعذّر تحميل المجتمع الآن. حاول مجددًا بعد قليل.</p><Link className="button" href="/">إعادة المحاولة</Link></section></Shell>;
- return <Shell viewer={viewer} active={route} accountTab={tab}>
- {route==='explore'&&<Explore data={data} viewer={viewer} q={q} method={method} page={page} feed={feed} followingAvailable={social.available} followedCount={social.followingCount} members={data.members} savedIds={data.savedIds}/>}
+ return <Shell viewer={viewer} active={route} accountTab={tab} authNext={destination}>
+ {isDiscovery&&<Explore searchMode={route==='search'} data={data} viewer={viewer} q={q} method={method} page={page} feed={feed} followingAvailable={social.available} followedCount={social.followingCount} members={data.members} savedIds={data.savedIds}/>}
  {route==='people'&&<People members={data.members||[]} viewer={viewer} q={q} page={page} hasMore={!!data.hasMore} total={data.total||0} view={peopleView} followingEnabled={social.available} followedIds={social.followedIds}/>}
  {(isNew||isEdit)&&<RecipeEditor key={data.recipe?`${data.recipe.id}-${data.recipe.version}`:`new-${template?.slug||'blank'}`} ownerId={viewer!.id} recipe={data.recipe} template={template?starterToInput(template):undefined} templateKey={template?.slug} categories={data.categories||[]}/>}
  {isDetail&&data.recipe&&<RecipeDetail key={data.recipe.id} recipe={data.recipe} comments={data.comments||[]} initialSaved={data.saved||false} viewer={viewer} followingEnabled={social.available} initialFollowing={social.followedIds.includes(data.recipe.owner_id)}/>}

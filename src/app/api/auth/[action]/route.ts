@@ -4,6 +4,7 @@ import {authSchema,emailSchema,emailCodeSchema} from '@/lib/validation';
 import {assertOrigin,jsonBody,json,failure,HttpError} from '@/lib/http';
 import {appOrigin,publicSignupEnabled} from '@/lib/env';
 import {requireUser} from '@/lib/data';
+import {safeAuthNext} from '@/lib/auth-navigation';
 
 function checkCaptcha(token?:string) {
   if(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY&&!token?.trim())throw new HttpError(400,'أكمل التحقق الأمني.');
@@ -26,7 +27,10 @@ export async function POST(request:Request,context:{params:Promise<{action:strin
       if(error)throw error;
       return json({ok:true});
     }
-    const body=await jsonBody(request);
+    const {next,...body}=z.record(z.string(),z.unknown()).parse(await jsonBody(request));
+    const destination=safeAuthNext(next);
+    const callback=new URL('/auth/callback',appOrigin());
+    if(destination!=='/account')callback.searchParams.set('next',destination);
     if(action==='reset') {
       await requireUser(client);
       const {password}=authSchema.pick({password:true}).parse(body);
@@ -43,14 +47,15 @@ export async function POST(request:Request,context:{params:Promise<{action:strin
         throw new HttpError(400,'لم يكتمل تأكيد بريدك. اطلب رمزًا جديدًا.');
       }
       // SSR cookies carry the session; never return tokens to application JavaScript.
-      return json({ok:true,next:'/account'});
+      return json({ok:true,next:destination});
     }
     if(action==='forgot'||action==='resend') {
       const input=emailSchema.parse(body);
       checkCaptcha(input.captchaToken);
+      const recovery=new URL('/auth/callback',appOrigin());recovery.searchParams.set('next','/auth/reset');if(destination!=='/account')recovery.searchParams.set('returnTo',destination);
       const result=action==='forgot'
-        ?await client.auth.resetPasswordForEmail(input.email,{redirectTo:`${appOrigin()}/auth/callback?next=/auth/reset`,captchaToken:input.captchaToken})
-        :await client.auth.resend({type:'signup',email:input.email,options:{emailRedirectTo:`${appOrigin()}/auth/callback`,captchaToken:input.captchaToken}});
+        ?await client.auth.resetPasswordForEmail(input.email,{redirectTo:recovery.href,captchaToken:input.captchaToken})
+        :await client.auth.resend({type:'signup',email:input.email,options:{emailRedirectTo:callback.href,captchaToken:input.captchaToken}});
       emailError(result.error);
       // Keep unknown and existing email addresses indistinguishable.
       return json(action==='resend'
@@ -60,7 +65,7 @@ export async function POST(request:Request,context:{params:Promise<{action:strin
     if(action==='signup') {
       const input=authSchema.parse(body);
       checkCaptcha(input.captchaToken);
-      const {data,error}=await client.auth.signUp({email:input.email,password:input.password,options:{emailRedirectTo:`${appOrigin()}/auth/callback`,captchaToken:input.captchaToken}});
+      const {data,error}=await client.auth.signUp({email:input.email,password:input.password,options:{emailRedirectTo:callback.href,captchaToken:input.captchaToken}});
       emailError(error);
       if(error)throw new HttpError(400,'تعذّر التسجيل. تحقق من البيانات أو جرّب تسجيل الدخول.');
       if(data.session) {

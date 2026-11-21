@@ -5,55 +5,114 @@ import {useRouter} from 'next/navigation';
 import {ArrowRight,ArrowLeft,ArrowUp,ArrowDown,Check,CheckCircle2,Camera,Coffee,Droplets,Eye,FilePenLine,Plus,Save,ShieldCheck,Trash2,X} from 'lucide-react';
 import {api,mediaUrl,Notice,useAction} from './shared';
 import type {Recipe} from '@/lib/types';
-import {brewingTools,editorNumber,editorPayload,fieldLabels,fieldStage,grindOptions,ingredientOptions,initialEditorValues,unitOptions,validateEditor,type EditorValues,type EditorIngredient,type EditorStep,type FieldErrors} from '@/lib/recipe-builder';
+import type {RecipeInput} from '@/lib/validation';
+import {brewingTools,editorIngredientMetrics,editorPayload,fieldLabels,fieldStage,grindOptions,ingredientOptions,initialEditorIngredients,initialEditorValues,legacyMetricConflicts,unitOptions,validateEditor,type EditorValues,type EditorIngredient,type EditorStep,type FieldErrors} from '@/lib/recipe-builder';
+import {ingredientMetric} from '@/lib/recipe-quantities';
+import {readRecipeDraft,writeRecipeDraft,removeRecipeDraft,removeSavedRecipeDraft,sameRecipeDraftSnapshot,type RecipeDraft,type RecipeDraftSnapshot,type DraftScope} from '@/lib/recipe-draft';
 
 const stages=[{title:'الفكرة والأداة',caption:'عرّفنا بتجربتك'},{title:'المقادير',caption:'التفاصيل التي تضبط الفنجان'},{title:'التحضير',caption:'خطوة تلو الأخرى'},{title:'المراجعة',caption:'نظرة أخيرة قبل المشاركة'}];
 type Option=readonly [string,string];
 function Choice({id,label,value,onChange,options,placeholder='اختر من القائمة',error}:{id:string;label:string;value:string;onChange:(value:string)=>void;options:readonly Option[];placeholder?:string;error?:string}){
-  const known=options.some(([key])=>key===value);const [custom,setCustom]=useState(!!value&&!known);
-  return <div className="builder-field"><label htmlFor={id}>{label}</label><select id={id} value={custom?'__custom':known?value:''} aria-invalid={!!error} onChange={e=>{setCustom(e.target.value==='__custom');onChange(e.target.value==='__custom'?'':e.target.value);}}><option value="">{placeholder}</option>{options.map(([key,text])=><option key={key} value={key}>{text}</option>)}<option value="__custom">أخرى — اكتبها بنفسك</option></select>{custom&&<input aria-label={`${label} — أخرى`} value={value} maxLength={id==='method'?80:id.startsWith('unit')?30:100} placeholder="اكتب اختيارك" onChange={e=>onChange(e.target.value)}/>}{error&&<small className="field-error">{error}</small>}</div>;
+  const known=options.some(([key])=>key===value);const [custom,setCustom]=useState(false);const showCustom=custom||!!value&&!known;
+  return <div className="builder-field"><label htmlFor={id}>{label}</label><select id={id} value={showCustom?'__custom':known?value:''} aria-invalid={!!error} onChange={e=>{setCustom(e.target.value==='__custom');onChange(e.target.value==='__custom'?'':e.target.value);}}><option value="">{placeholder}</option>{options.map(([key,text])=><option key={key} value={key}>{text}</option>)}<option value="__custom">أخرى — اكتبها بنفسك</option></select>{showCustom&&<input aria-label={`${label} — أخرى`} value={value} maxLength={id==='method'?80:id.startsWith('unit')?30:100} placeholder="اكتب اختيارك" onChange={e=>onChange(e.target.value)}/>}{error&&<small className="field-error">{error}</small>}</div>;
 }
 function BuilderField({id,label,hint,error,children}:{id:string;label:string;hint?:string;error?:string;children:ReactNode}){
   return <div className="builder-field"><label htmlFor={id}>{label}</label>{children}{error?<small id={`${id}-hint`} className="field-error">{error}</small>:hint&&<small id={`${id}-hint`}>{hint}</small>}</div>;
 }
-export function RecipeEditor({recipe,categories}:{recipe?:Recipe;categories:{id:string;name_ar:string}[]}){
+type RecipeEditorProps={ownerId:string;recipe?:Recipe;template?:RecipeInput;templateKey?:string;categories:{id:string;name_ar:string}[]};
+export function RecipeEditor(props:RecipeEditorProps){return <EditorSession key={`${props.ownerId}:${props.recipe?`recipe:${props.recipe.id}`:props.templateKey?`template:${props.templateKey}`:'new'}:${props.recipe?.version||0}`} {...props}/>;}
+function EditorSession({ownerId,recipe,template,templateKey,categories}:RecipeEditorProps){
+  const source=recipe??template;
   const router=useRouter();const action=useAction();const [stage,setStage]=useState(0);const heading=useRef<HTMLHeadingElement>(null);const fileInput=useRef<HTMLInputElement>(null);const counter=useRef(0);
-  const [values,setValues]=useState(()=>initialEditorValues(recipe,categories.find(c=>c.id==='coffee')?.id||categories[0]?.id||'coffee'));
-  const [ingredients,setIngredients]=useState<EditorIngredient[]>(()=>recipe?.ingredients.length?recipe.ingredients.map((item,index)=>({...item,key:`ingredient-${index}`,quantity:String(item.quantity??'')})):[{key:'ingredient-0',name:'',quantity:'',unit:'g'}]);
-  const [steps,setSteps]=useState<EditorStep[]>(()=>recipe?.steps.length?recipe.steps.map((step,index)=>({...step,key:`step-${index}`})):[{key:'step-0',instruction:''}]);
+  const [values,setValues]=useState(()=>initialEditorValues(source,categories.find(c=>c.id==='coffee')?.id||categories[0]?.id||'coffee'));
+  const [ingredients,setIngredients]=useState<EditorIngredient[]>(()=>initialEditorIngredients(source));
+  const [steps,setSteps]=useState<EditorStep[]>(()=>source?.steps.length?source.steps.map((step,index)=>({...step,key:`step-${index}`})):[{key:'step-0',instruction:''}]);
   const [errors,setErrors]=useState<FieldErrors>({});const [image,setImage]=useState<File|null>(null);const [imagePreview,setImagePreview]=useState('');const [imageError,setImageError]=useState('');const [dirty,setDirty]=useState(false);const [savedId,setSavedId]=useState<string|null>(null);
-  useEffect(()=>{if(!image){setImagePreview('');return;}const url=URL.createObjectURL(image);setImagePreview(url);return()=>URL.revokeObjectURL(url);},[image]);
+  const [scope]=useState<DraftScope>(()=>({ownerId,recipeId:recipe?.id||null,templateKey:recipe?null:templateKey||null}));
+  const [legacyConflicts]=useState(()=>legacyMetricConflicts(source,initialEditorIngredients(source)));
+  const [legacyMetricsAccepted,setLegacyMetricsAccepted]=useState(false);
+  const [recovery,setRecovery]=useState<RecipeDraft|null>(null);const [recoveryReady,setRecoveryReady]=useState(false);const [storageFailed,setStorageFailed]=useState(false);
+  const [localSaved,setLocalSaved]=useState(false);const [recoveryNote,setRecoveryNote]=useState('');
+  const activeEditor=useRef(false);const writerId=useRef('');const navigationEpoch=useRef(0);
+  const liveDraft=useRef<{snapshot:RecipeDraftSnapshot;dirty:boolean;blocked:boolean}>({snapshot:{writerId:'',values,ingredients,steps,stage,baseVersion:recipe?.version||null,legacyMetricsAccepted},dirty:false,blocked:true});
+  liveDraft.current={snapshot:{writerId:writerId.current,values,ingredients,steps,stage,baseVersion:recipe?.version||null,legacyMetricsAccepted},dirty,blocked:!recoveryReady||!!recovery||!!savedId};
   useEffect(()=>{
-    if(!dirty||savedId)return;
-    const unload=(e:BeforeUnloadEvent)=>{e.preventDefault();};
-    const navigate=(e:MouseEvent)=>{if(e.defaultPrevented||e.button!==0||e.ctrlKey||e.metaKey||e.shiftKey||e.altKey)return;const anchor=(e.target as Element).closest('a[href]');if(!(anchor instanceof HTMLAnchorElement)||anchor.target==='_blank'||anchor.hasAttribute('download'))return;const next=new URL(anchor.href);if(next.pathname===location.pathname&&next.search===location.search)return;if(!window.confirm('لديك تعديلات لم تُحفظ. هل تريد مغادرة الوصفة دون حفظها؟')){e.preventDefault();e.stopPropagation();}};
-    window.addEventListener('beforeunload',unload);document.addEventListener('click',navigate,true);return()=>{window.removeEventListener('beforeunload',unload);document.removeEventListener('click',navigate,true);};
-  },[dirty,savedId]);
-  const markChanged=()=>{setDirty(true);setErrors({});action.setMessage('');};
+    activeEditor.current=true;if(!writerId.current)writerId.current=crypto.randomUUID();
+    try{const result=readRecipeDraft(window.localStorage,scope);setRecovery(result.draft);setStorageFailed(result.unavailable);}catch{setStorageFailed(true);}
+    setRecoveryReady(true);
+    const persist=()=>{const current=liveDraft.current;if(current.dirty&&!current.blocked)try{writeRecipeDraft(window.localStorage,scope,current.snapshot);}catch{/* The visible save action remains available when storage is blocked. */}};
+    const leaving=()=>{persist();navigationEpoch.current++;};
+    const unload=(e:BeforeUnloadEvent)=>{if(liveDraft.current.dirty&&!liveDraft.current.blocked)e.preventDefault();};
+    const navigate=(e:MouseEvent)=>{
+      if(e.defaultPrevented||e.button!==0||e.ctrlKey||e.metaKey||e.shiftKey||e.altKey)return;
+      const anchor=e.target instanceof Element?e.target.closest('a[href]'):null;
+      if(!(anchor instanceof HTMLAnchorElement)||anchor.target==='_blank'||anchor.hasAttribute('download'))return;
+      const next=new URL(anchor.href);if(next.pathname===location.pathname&&next.search===location.search)return;
+      if(liveDraft.current.dirty&&!liveDraft.current.blocked&&!window.confirm('الوصفة لم تُحفظ في حسابك بعد. هل تريد المغادرة؟ الصور غير المرفوعة تحتاج اختيارها مجددًا.')){e.preventDefault();e.stopPropagation();return;}
+      navigationEpoch.current++;
+    };
+    window.addEventListener('pagehide',leaving);window.addEventListener('popstate',leaving);
+    window.addEventListener('beforeunload',unload);document.addEventListener('click',navigate,true);
+    return()=>{persist();activeEditor.current=false;window.removeEventListener('pagehide',leaving);window.removeEventListener('popstate',leaving);window.removeEventListener('beforeunload',unload);document.removeEventListener('click',navigate,true);};
+  },[scope]);
+  useEffect(()=>{
+    if(!dirty||!recoveryReady||recovery||savedId)return;
+    let saved=false;try{saved=writeRecipeDraft(window.localStorage,scope,liveDraft.current.snapshot);}catch{/* Storage may be disabled. */}
+    setStorageFailed(!saved);setLocalSaved(saved);
+  },[values,ingredients,steps,stage,legacyMetricsAccepted,dirty,recoveryReady,recovery,savedId,scope]);
+  function clearLocalDraft(){liveDraft.current.dirty=false;setLocalSaved(false);try{if(!removeRecipeDraft(window.localStorage,scope))setStorageFailed(true);}catch{setStorageFailed(true);}}
+  function restoreDraft(){
+    if(!recovery)return;
+    setValues(recovery.values);setIngredients(recovery.ingredients.map((item,index)=>({...item,key:`restored-ingredient-${index}`})));setSteps(recovery.steps.map((item,index)=>({...item,key:`restored-step-${index}`})));setStage(recovery.stage);
+    setLegacyMetricsAccepted(recovery.legacyMetricsAccepted&&recovery.baseVersion===(recipe?.version||null));setRecovery(null);setDirty(true);setErrors({});setRecoveryNote('استُعيد النص والمقادير. أعد اختيار أي صورة لم تُرفع بعد.');
+  }
+  function discardChanges(){
+    if(!window.confirm('تجاهل التعديلات المحلية والعودة إلى الوصفة الأصلية؟'))return;
+    clearLocalDraft();setDirty(false);setRecovery(null);setRecoveryNote('');setLegacyMetricsAccepted(false);setErrors({});setImage(null);setImageError('');setStage(0);
+    setValues(initialEditorValues(source,categories.find(c=>c.id==='coffee')?.id||categories[0]?.id||'coffee'));setIngredients(initialEditorIngredients(source));setSteps(source?.steps.length?source.steps.map((step,index)=>({...step,key:`step-${index}`})):[{key:'step-0',instruction:''}]);
+    if(fileInput.current)fileInput.current.value='';
+  }
+  useEffect(()=>{if(!image){setImagePreview('');return;}const url=URL.createObjectURL(image);setImagePreview(url);return()=>URL.revokeObjectURL(url);},[image]);
+  const markChanged=()=>{setDirty(true);setLocalSaved(false);setErrors({});action.setMessage('');};
   function change(key:keyof EditorValues,value:string){setValues(current=>({...current,[key]:value}));markChanged();}
   function changeIngredient(key:string,patch:Partial<EditorIngredient>){setIngredients(rows=>rows.map(row=>row.key===key?{...row,...patch}:row));markChanged();}
   function moveStep(index:number,direction:number){setSteps(rows=>{const next=[...rows];[next[index],next[index+direction]]=[next[index+direction],next[index]];return next;});markChanged();}
   function visit(next:number){setStage(next);requestAnimationFrame(()=>{heading.current?.focus();heading.current?.scrollIntoView({block:'start',behavior:'smooth'});});}
-  function nextStage(){const validation=validateEditor(editorPayload(values,ingredients,steps,'published',recipe));const relevant=Object.fromEntries(Object.entries(validation.errors).filter(([key])=>fieldStage(key)===stage));setErrors(relevant);if(Object.keys(relevant).length)return;visit(Math.min(3,stage+1));}
+  function nextStage(){const validation=validateEditor(editorPayload(values,ingredients,steps,'published',recipe));const relevant=Object.fromEntries(Object.entries(validation.errors).filter(([key])=>fieldStage(key)===stage));if(stage===1&&legacyConflicts.length&&!legacyMetricsAccepted)relevant.ingredients='راجع اختلاف المقادير القديمة واعتمد المقادير الحالية.';setErrors(relevant);if(Object.keys(relevant).length)return;visit(Math.min(3,stage+1));}
   async function save(status:'draft'|'published'){
     const validation=validateEditor(editorPayload(values,ingredients,steps,status,recipe));setErrors(validation.errors);
     if(!validation.data){visit(fieldStage(Object.keys(validation.errors)[0]));return;}
+    if(legacyConflicts.length&&!legacyMetricsAccepted){setErrors({ingredients:'راجع اختلاف المقادير القديمة واعتمد المقادير الحالية.'});visit(1);return;}
     if(imageError){visit(0);return;}
-    const result=await action.run(async()=>{const saved=await api<{id:string}>('/api/community/recipes','POST',validation.data);setSavedId(saved.id);if(image){const upload=new FormData();upload.set('kind','recipe');upload.set('recipe_id',saved.id);upload.set('file',image);await api('/api/community/images','POST',upload);}return saved;});
-    if(result){setDirty(false);router.push(`/recipes/${result.id}`);router.refresh();}
+    const savedSnapshot=liveDraft.current.snapshot;const saveNavigationEpoch=navigationEpoch.current;
+    const stillCurrent=()=>activeEditor.current&&sameRecipeDraftSnapshot(liveDraft.current.snapshot,savedSnapshot);
+    const result=await action.run(async()=>{
+      const saved=await api<{id:string}>('/api/community/recipes','POST',validation.data);
+      try{const cleared=removeSavedRecipeDraft(window.localStorage,scope,savedSnapshot);if(cleared.unavailable&&activeEditor.current)setStorageFailed(true);}catch{if(activeEditor.current)setStorageFailed(true);}
+      if(stillCurrent()){liveDraft.current.dirty=false;setLocalSaved(false);setDirty(false);setSavedId(saved.id);}
+      if(image){const upload=new FormData();upload.set('kind','recipe');upload.set('recipe_id',saved.id);upload.set('file',image);await api('/api/community/images','POST',upload);}
+      return saved;
+    });
+    if(result&&stillCurrent()&&navigationEpoch.current===saveNavigationEpoch){setDirty(false);router.push(`/recipes/${result.id}`);router.refresh();}
   }
   const inputProps=(key:keyof EditorValues)=>({id:key,value:values[key],onChange:(e:ChangeEvent<HTMLInputElement|HTMLTextAreaElement>)=>change(key,e.target.value),'aria-invalid':!!errors[key],'aria-describedby':`${key}-hint`});
   const previewImage=imagePreview||(recipe?.recipe_images?mediaUrl('recipe-images',recipe.recipe_images.object_path):'');
-  const dose=editorNumber(values.dose_g),water=editorNumber(values.water_g);const ratio=dose&&water&&Number.isFinite(dose)&&Number.isFinite(water)?(water/dose).toFixed(1):null;
+  const ingredientMetrics=editorIngredientMetrics(ingredients);const dose=ingredientMetrics.dose_g,water=ingredientMetrics.water_g;const ratio=dose&&water?(water/dose).toFixed(1):null;
+  const reviewValues={...values,dose_g:dose==null?'':String(dose),water_g:water==null?'':String(water)};
   const filledIngredients=ingredients.filter(i=>i.name.trim());const filledSteps=steps.filter(s=>s.instruction.trim());
   const checks=[{label:'اسم التجربة',done:values.title.trim().length>=2,index:0},{label:'أداة التحضير',done:!!values.method.trim(),index:0},{label:'المكونات',done:filledIngredients.length>0,index:1},{label:'خطوات التحضير',done:filledSteps.length>0,index:2}];
   const reviewErrors=validateEditor(editorPayload(values,ingredients,steps,'published',recipe)).errors;
+  if(legacyConflicts.length&&!legacyMetricsAccepted)reviewErrors.ingredients='اعتمد مقادير المكونات الحالية.';
   const stageError=Object.entries(errors).find(([key])=>key.startsWith(stage===1?'ingredients':stage===2?'steps':'__none'))?.[1];
   return <div className="recipe-builder">
-    <div className="builder-heading"><div><span className="overline"><FilePenLine size={16}/>دفتر تجاربك / {recipe?'تعديل وصفة':'وصفة جديدة'}</span><h1>{recipe?'كل تجربة تستحق تطويرًا.':'فنجانك يستحق حكاية.'}</h1><p>ابنِ وصفتك خطوة بخطوة. أكمل الآن، أو احفظها لتعود إليها.</p></div><span className={`builder-save-state ${dirty?'is-dirty':''}`}><span/>{action.busy?'جاري الحفظ…':savedId?'حُفظت الوصفة':dirty?'تعديلات غير محفوظة':recipe?'تعديل وصفتك':'مساحة لتجربة جديدة'}</span></div>
-    <ol className="builder-progress" aria-label="مراحل بناء الوصفة">{stages.map((item,index)=><li key={item.title}><button type="button" aria-current={stage===index?'step':undefined} onClick={()=>visit(index)} disabled={action.busy||!!savedId}><span className="progress-number">{index<3&&index!==stage&&!Object.keys(reviewErrors).some(key=>fieldStage(key)===index)?<Check size={17}/>:String(index+1).padStart(2,'0')}</span><span><strong>{item.title}</strong><small>{item.caption}</small></span></button></li>)}</ol>
+    <div className="builder-heading"><div><span className="overline"><FilePenLine size={16}/>دفتر تجاربك / {recipe?'تعديل وصفة':'وصفة جديدة'}</span><h1>{recipe?'كل تجربة تستحق تطويرًا.':'فنجانك يستحق حكاية.'}</h1><p>ابنِ وصفتك خطوة بخطوة. أكمل الآن، أو احفظها لتعود إليها.</p></div><span className={`builder-save-state ${dirty?'is-dirty':''}`} role="status"><span/>{action.busy?'جاري الحفظ…':savedId?'حُفظت الوصفة':dirty?localSaved?'محفوظة مؤقتًا على هذا المتصفح':'تعديلات غير محفوظة':recipe?'تعديل وصفتك':'مساحة لتجربة جديدة'}</span></div>
+    {recovery&&<section aria-label="استعادة تعديلات الوصفة"><Notice><strong>وجدنا تعديلات لم تحفظها في حسابك.</strong><p>حُفظت على هذا المتصفح بتاريخ {new Date(recovery.savedAt).toLocaleString('ar')}. استعد النص والمقادير، أو تجاهل النسخة المحلية وابدأ من النسخة الحالية. الصور غير المرفوعة لا تُستعاد.</p>{recovery.baseVersion!==(recipe?.version||null)&&<p><strong>تغيّرت الوصفة المحفوظة منذ هذه التعديلات. الاستعادة ستستبدل محتوى المحرر الحالي بالنسخة المحلية؛ راجعها قبل الحفظ.</strong></p>}<div className="inline-actions"><button type="button" className="button small" onClick={restoreDraft}>استعد تعديلاتي</button><button type="button" className="button secondary small" onClick={()=>{clearLocalDraft();setRecovery(null);}}>تجاهل النسخة المحلية</button></div></Notice></section>}
+    {storageFailed&&<Notice error>تعذّر حفظ نسخة مؤقتة على هذا المتصفح. استخدم «حفظ مسودة» قبل المغادرة حتى لا تفقد تعديلاتك.</Notice>}
+    {recoveryNote&&<Notice>{recoveryNote}</Notice>}
+    {dirty&&localSaved&&<p className="builder-hint">النسخة المؤقتة تخص حسابك في هذا المتصفح وتبقى 14 يومًا. استخدم «حفظ مسودة» لحفظها في حسابك. الصور لا تدخل في الاستعادة. <button type="button" className="text-link" disabled={action.busy} onClick={discardChanges}>تجاهل تعديلاتي المحلية</button></p>}
+    <ol className="builder-progress" aria-label="مراحل بناء الوصفة">{stages.map((item,index)=><li key={item.title}><button type="button" aria-current={stage===index?'step':undefined} onClick={()=>visit(index)} disabled={action.busy||!!savedId||!recoveryReady||!!recovery}><span className="progress-number">{index<3&&index!==stage&&!Object.keys(reviewErrors).some(key=>fieldStage(key)===index)?<Check size={17}/>:String(index+1).padStart(2,'0')}</span><span><strong>{item.title}</strong><small>{item.caption}</small></span></button></li>)}</ol>
     <div className="builder-layout"><form className="builder-form" noValidate onSubmit={e=>{e.preventDefault();if(stage<3)nextStage();else void save('published');}}>
-      <fieldset disabled={action.busy||!!savedId}>
+      <fieldset disabled={action.busy||!!savedId||!recoveryReady||!!recovery}>
         <section className="builder-panel" aria-labelledby="builder-step-title"><div className="builder-panel-heading"><span>0{stage+1} / 04</span><h2 ref={heading} id="builder-step-title" tabIndex={-1}>{stages[stage].title}</h2><p>{stages[stage].caption}</p></div>
         {stage===0&&<>
           <BuilderField id="title" label="ما اسم هذه التجربة؟ *" error={errors.title}><input {...inputProps('title')} maxLength={120} placeholder="مثلًا: فنجان الصباح على V60" autoComplete="off"/></BuilderField>
@@ -63,14 +122,17 @@ export function RecipeEditor({recipe,categories}:{recipe?:Recipe;categories:{id:
         </>}
         {stage===0&&imageError&&<button type="button" className="text-link" onClick={()=>setImageError('')}>تجاهل الصورة المرفوضة والمتابعة</button>}
         {stage===1&&<>
-          <div className="builder-section-heading"><h3>على طاولة التحضير</h3><span>{filledIngredients.length} / 30 مكوّنًا</span></div><p className="builder-hint">اختر المكوّن ووحدته. الكمية اختيارية عندما لا تحتاج إلى قياس.</p>
-          <div className="builder-ingredients">{ingredients.map((item,index)=><div className="builder-ingredient" key={item.key}><div className="row-heading"><b>مكوّن {index+1}</b><button className="builder-icon" type="button" aria-label={`حذف المكوّن ${index+1}`} onClick={()=>{setIngredients(rows=>rows.filter(row=>row.key!==item.key));markChanged();}}><Trash2 size={16}/></button></div><Choice id={`ingredient-${item.key}`} label="المكوّن" value={item.name} options={ingredientOptions.map(name=>[name,name])} onChange={name=>changeIngredient(item.key,{name})}/><div className="builder-grid"><BuilderField id={`quantity-${item.key}`} label="الكمية"><input id={`quantity-${item.key}`} type="text" inputMode="decimal" dir="ltr" value={item.quantity} maxLength={12} placeholder="مثلًا 18" onChange={e=>changeIngredient(item.key,{quantity:e.target.value})}/></BuilderField><Choice id={`unit-${item.key}`} label="الوحدة" value={item.unit} options={unitOptions} onChange={unit=>changeIngredient(item.key,{unit})} placeholder="بدون وحدة"/></div></div>)}</div>
+          <div className="builder-section-heading"><h3>على طاولة التحضير</h3><span>{filledIngredients.length} / 30 مكوّنًا</span></div><p className="builder-hint">اكتب المقادير مرة واحدة هنا، واختر الوحدة التي تستخدمها. الكمية اختيارية. نحسب الجرعة والنسبة تلقائيًا عندما يكون البن بالغرام أو الكيلوغرام والماء بوحدة قابلة للتحويل.</p>
+          {legacyConflicts.length>0&&!legacyMetricsAccepted&&<Notice error><strong>مقادير الوصفة القديمة غير متطابقة.</strong><p>{legacyConflicts.map(metric=>`${fieldLabels[metric]} المحفوظة: ${source?.[metric]} g، مجموع المكونات الحالي: ${ingredientMetrics[metric]==null?'غير مكتمل':`${ingredientMetrics[metric]} g`}`).join(' · ')}</p><p>صحّح صفوف المكونات، ثم اعتمد مقاديرها. ستُحسب جميع الأرقام منها عند الحفظ.</p><button type="button" className="button secondary small" disabled={Object.keys(ingredientMetrics.errors).length>0} onClick={()=>{setLegacyMetricsAccepted(true);markChanged();}}>اعتمد مقادير المكونات الحالية</button></Notice>}
+          <div className="builder-ingredients">{ingredients.map((item,index)=><div className="builder-ingredient" key={item.key}><div className="row-heading"><b>مكوّن {index+1}</b><button className="builder-icon" type="button" aria-label={`حذف المكوّن ${index+1}`} onClick={()=>{setIngredients(rows=>rows.filter(row=>row.key!==item.key));markChanged();}}><Trash2 size={16}/></button></div><Choice id={`ingredient-${item.key}`} label="المكوّن" value={item.name} options={ingredientOptions.map(name=>[name,name])} onChange={name=>changeIngredient(item.key,{name})}/><div className="builder-grid"><BuilderField id={`quantity-${item.key}`} label="الكمية" error={errors[`ingredients.${index}.quantity`]}><input id={`quantity-${item.key}`} type="text" inputMode="decimal" dir="ltr" value={item.quantity} maxLength={12} placeholder="مثلًا 18" onChange={e=>changeIngredient(item.key,{quantity:e.target.value})}/></BuilderField><Choice id={`unit-${item.key}`} label="الوحدة" value={item.unit} options={unitOptions} onChange={unit=>changeIngredient(item.key,{unit})} placeholder="بدون وحدة" error={errors[`ingredients.${index}.unit`]}/></div></div>)}</div>
           {stageError&&<Notice error>{stageError}</Notice>}<button className="builder-add" type="button" disabled={ingredients.length>=30} onClick={()=>{setIngredients(rows=>[...rows,{key:`new-${++counter.current}`,name:'',quantity:'',unit:'g'}]);markChanged();}}><Plus size={18}/>أضف مكوّنًا</button>
           <div className="builder-divider"/><div className="builder-section-heading"><h3>اضبط تفاصيل الفنجان</h3><span>اختيارية</span></div>
           <div className="builder-grid"><BuilderField id="beans" label="البن" error={errors.beans}><input {...inputProps('beans')} maxLength={150} placeholder="المنشأ أو المعالجة أو اسم البن"/></BuilderField><BuilderField id="roaster" label="المحمصة" error={errors.roaster}><input {...inputProps('roaster')} maxLength={120} placeholder="اسم المحمصة"/></BuilderField><Choice id="grind" label="درجة الطحن" value={values.grind} options={grindOptions.map(name=>[name,name])} onChange={value=>change('grind',value)} error={errors.grind}/>
-          {([{key:'dose_g',label:'جرعة البن',unit:'g',max:'1000'},{key:'water_g',label:'الماء',unit:'g',max:'20000'},{key:'yield_g',label:'الناتج في الكوب',unit:'g',max:'20000'},{key:'temperature_c',label:'حرارة الماء',unit:'°C',max:'100'}] as const).map(item=><BuilderField key={item.key} id={item.key} label={item.label} error={errors[item.key]} hint={`حتى ${item.max} ${item.unit}`}><div className="builder-unit-input"><input {...inputProps(item.key)} type="text" inputMode="decimal" dir="ltr" maxLength={12} placeholder="—"/><span>{item.unit}</span></div></BuilderField>)}</div>
+          {([{key:'yield_g',label:'الناتج في الكوب',unit:'g',max:'20000'},{key:'temperature_c',label:'حرارة الماء',unit:'°C',max:'100'}] as const).map(item=><BuilderField key={item.key} id={item.key} label={item.label} error={errors[item.key]} hint={`حتى ${item.max} ${item.unit}`}><div className="builder-unit-input"><input {...inputProps(item.key)} type="text" inputMode="decimal" dir="ltr" maxLength={12} placeholder="—"/><span>{item.unit}</span></div></BuilderField>)}</div>
+          <div className="review-metrics" aria-label="مقادير محسوبة من المكونات"><span>جرعة البن من المكونات<b>{dose==null?'غير محددة':`${dose} g`}</b></span><span>الماء من المكونات<b>{water==null?'غير محدد':`${water} g`}</b></span></div>{(errors.dose_g||errors.water_g)&&<Notice error>{errors.dose_g||errors.water_g} عدّل الكمية في صفوف المكونات أعلاه.</Notice>}
           <div className="duration-field"><span>وقت التحضير</span><div className="builder-grid"><BuilderField id="minutes" label="دقائق"><input {...inputProps('minutes')} type="text" inputMode="numeric" dir="ltr" placeholder="0" maxLength={4}/></BuilderField><BuilderField id="seconds" label="ثوانٍ (0–59)"><input {...inputProps('seconds')} type="text" inputMode="numeric" dir="ltr" placeholder="00" maxLength={2}/></BuilderField></div>{errors.time_seconds&&<small className="field-error">{errors.time_seconds}</small>}</div>
-          {ratio&&<div className="builder-ratio"><Droplets size={20}/><div><strong>نسبة الماء إلى البن <bdi>1 : {ratio}</bdi></strong><small>محسوبة من جرعة البن وكمية الماء اللتين أدخلتهما.</small></div></div>}
+          {ratio&&<div className="builder-ratio"><Droplets size={20}/><div><strong>نسبة الماء إلى البن <bdi>1 : {ratio}</bdi></strong><small>محسوبة من مجموع البن والماء في المكونات. يُعامل 1 ml ماء كـ 1 g؛ الحليب والثلج لا يدخلان في النسبة.</small></div></div>}
+          {!ratio&&ingredients.some(item=>ingredientMetric(item.name))&&<p className="builder-hint">لا توجد نسبة محسوبة لأن كمية البن أو الماء غير مكتملة أو بوحدة مثل الملاعق لا يمكن تحويلها بدقة إلى غرامات. يمكنك حفظ الوصفة ونشرها بهذه الوحدات.</p>}
         </>}
         {stage===2&&<>
           <p className="builder-hint">اشرح ما تفعله، بالترتيب. يمكنك إضافة الخطوات وترتيبها من الأسهم.</p><div className="builder-steps">{steps.map((step,index)=><div className="builder-step" key={step.key}><div className="row-heading"><b><span>{String(index+1).padStart(2,'0')}</span>خطوة التحضير</b><div><button type="button" className="builder-icon" disabled={index===0} aria-label={`نقل الخطوة ${index+1} للأعلى`} onClick={()=>moveStep(index,-1)}><ArrowUp size={16}/></button><button type="button" className="builder-icon" disabled={index===steps.length-1} aria-label={`نقل الخطوة ${index+1} للأسفل`} onClick={()=>moveStep(index,1)}><ArrowDown size={16}/></button><button type="button" className="builder-icon" aria-label={`حذف الخطوة ${index+1}`} onClick={()=>{setSteps(rows=>rows.filter(row=>row.key!==step.key));markChanged();}}><Trash2 size={16}/></button></div></div><textarea aria-label={`تعليمات الخطوة ${index+1}`} rows={3} maxLength={2000} value={step.instruction} placeholder={index===0?'ابدأ بتجهيز البن والأداة، واشرح ما تفعله…':'ما الخطوة التالية؟ أضف الوقت أو الكمية إن احتجت.'} onChange={e=>{setSteps(rows=>rows.map(row=>row.key===step.key?{...row,instruction:e.target.value}:row));markChanged();}}/><small>{step.instruction.length} / 2000</small></div>)}</div>{stageError&&<Notice error>{stageError}</Notice>}<button className="builder-add" type="button" disabled={steps.length>=30} onClick={()=>{setSteps(rows=>[...rows,{key:`new-${++counter.current}`,instruction:''}]);markChanged();}}><Plus size={18}/>أضف خطوة تحضير</button><div className="builder-divider"/><BuilderField id="tasting_notes" label="كيف كانت النتيجة؟" hint="اختياري · النكهات، القوام، أو ما ستغيّره في التجربة القادمة." error={errors.tasting_notes}><textarea {...inputProps('tasting_notes')} rows={4} maxLength={1000} placeholder="اكتب ملاحظتك التي تجعل التجربة مفيدة لغيرك…"/></BuilderField>
@@ -78,7 +140,7 @@ export function RecipeEditor({recipe,categories}:{recipe?:Recipe;categories:{id:
         {stage===3&&<>
           <div className="review-intro"><CheckCircle2 size={23}/><div><strong>هذه وصفتك قبل أن يراها المجتمع.</strong><p>راجع التفاصيل، ثم انشرها أو احتفظ بها كمسودة خاصة.</p></div></div>
           <div className="review-cover">{previewImage?<img src={previewImage} alt="صورة الوصفة قبل النشر"/>:<img className="review-mark" src="/brand/mark-yellow.svg" alt=""/>}<span>{values.method||'أداة التحضير'}</span></div><h3 className="review-title">{values.title||'اسم تجربتك'}</h3>{values.description&&<p className="preserve builder-hint">{values.description}</p>}
-          <div className="review-section"><div className="builder-section-heading"><h3>المقادير والتفاصيل</h3><button className="text-link" type="button" onClick={()=>visit(1)}>تعديل</button></div><ul className="review-ingredients">{filledIngredients.map(item=><li key={item.key}><span>{item.name}</span><bdi>{item.quantity} {unitOptions.find(([value])=>value===item.unit)?.[1].split(' · ')[0]||item.unit}</bdi></li>)}</ul><div className="review-metrics">{(['beans','roaster','grind','dose_g','water_g','yield_g','temperature_c'] as const).filter(key=>values[key]).map(key=><span key={key}>{fieldLabels[key]}<b>{values[key]}{key.endsWith('_g')?' g':key==='temperature_c'?' °C':''}</b></span>)}{(values.minutes||values.seconds)&&<span>وقت التحضير<b>{values.minutes||'0'} د · {values.seconds||'0'} ث</b></span>}</div></div>
+          <div className="review-section"><div className="builder-section-heading"><h3>المقادير والتفاصيل</h3><button className="text-link" type="button" onClick={()=>visit(1)}>تعديل</button></div><ul className="review-ingredients">{filledIngredients.map(item=><li key={item.key}><span>{item.name}</span><bdi>{item.quantity} {unitOptions.find(([value])=>value===item.unit)?.[1].split(' · ')[0]||item.unit}</bdi></li>)}</ul><div className="review-metrics">{(['beans','roaster','grind','dose_g','water_g','yield_g','temperature_c'] as const).filter(key=>reviewValues[key]).map(key=><span key={key}>{fieldLabels[key]}<b>{reviewValues[key]}{key.endsWith('_g')?' g':key==='temperature_c'?' °C':''}</b></span>)}{(values.minutes||values.seconds)&&<span>وقت التحضير<b>{values.minutes||'0'} د · {values.seconds||'0'} ث</b></span>}</div></div>
           <div className="review-section"><div className="builder-section-heading"><h3>خطوات التحضير</h3><button type="button" className="text-link" onClick={()=>visit(2)}>تعديل</button></div><ol className="review-steps">{filledSteps.map(step=><li className="preserve" key={step.key}>{step.instruction}</li>)}</ol>{values.tasting_notes&&<blockquote className="preserve">{values.tasting_notes}</blockquote>}</div>
           <div className="review-checks">{checks.map(check=><button type="button" key={check.label} onClick={()=>visit(check.index)} className={check.done?'is-complete':''}>{check.done?<CheckCircle2 size={17}/>:<Plus size={17}/>}<span>{check.done?check.label:`أكمل ${check.label}`}</span></button>)}</div>
         </>}

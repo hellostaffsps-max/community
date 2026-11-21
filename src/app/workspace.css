@@ -30,3 +30,50 @@
 @media(max-height:800px) and (min-width:961px){.app-sidebar{padding-top:22px}.app-sidebar>.brand{padding-bottom:20px}.app-sidebar-note{padding:16px;margin:20px 3px}.app-sidebar-note>img,.app-sidebar-note>span{display:none}.app-sidebar-note p{margin-bottom:0}}
 @media(max-width:960px){.app-bottom-nav>a{font-size:10px}}
 @media(prefers-reduced-motion:reduce){.app-content,.nav-pending,.loading-lines>span,.loading-cards>span{animation:none!important}.community-app *{transition:none!important}}
+
+/* A single discovery control and the same mobile destinations throughout the journey. */
+.community-app .discovery-heading{padding:32px 0 20px;align-items:center}
+.community-app .discovery-heading h1{margin-bottom:9px}
+.community-app .discovery-heading p{margin-bottom:0}
+.discovery-create{white-space:nowrap;font-size:12px}
+.community-app .discovery-search{display:grid;grid-template-columns:minmax(0,1fr) minmax(170px,225px) auto;gap:9px;margin-bottom:28px}
+.community-app .discovery-search .search-input{min-width:0}
+.discovery-method{min-width:0}
+.community-app .discovery-method select{width:100%;height:48px;font-size:12px}
+.community-app .discovery-search>.button{min-height:48px}
+.discovery-reset{grid-column:1/-1;justify-self:start;font-size:11px;min-height:30px}
+.discovery-results-heading{display:flex;justify-content:space-between;align-items:center;gap:16px;margin:0 0 18px}
+.discovery-results-heading h2{font-size:24px;margin:0}
+.discovery-results-heading>span{font-size:11px;color:var(--muted);white-space:nowrap}
+.community-results{margin-bottom:36px}
+.community-start{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:18px;align-items:center;padding:24px;background:#fffdf8;border:1px solid var(--line);border-radius:10px;margin-top:28px}
+.community-start>svg{color:var(--cobalt)}
+.community-start h2{font-size:18px;margin:0 0 7px}
+.community-start p{font-size:12px;color:var(--muted);line-height:1.9;margin:0}
+.community-start>.quiet-link{font-size:12px;white-space:nowrap}
+@media(max-width:960px){
+  .site-footer{padding-bottom:100px}
+  .visitor-bottom-nav>a{flex:1;max-width:120px;min-height:48px}
+  .visitor-bottom-nav .mobile-join{color:var(--ink)}
+  .visitor-bottom-nav .mobile-join svg{background:var(--yellow);border-radius:6px;box-sizing:content-box;padding:4px;margin-block:-4px}
+  .visitor-bottom-nav>a[aria-current=page]{color:var(--cobalt)}
+}
+@media(max-width:740px){
+  .community-app .discovery-heading{padding:22px 0 18px;gap:12px;align-items:start}
+  .community-app .discovery-heading .overline{font-size:9px;margin-bottom:8px}
+  .community-app .discovery-heading h1{font-size:28px;margin-bottom:6px}
+  .community-app .discovery-heading p{font-size:12px}
+  .discovery-create{font-size:11px;min-height:32px}
+  .community-app .discovery-search{grid-template-columns:minmax(0,1fr) auto;margin-bottom:22px;padding:8px}
+  .community-app .discovery-search .search-input{grid-column:1/-1;padding:0 9px;border-bottom:0}
+  .community-app .discovery-search input{padding:10px 0;font-size:16px}
+  .community-app .discovery-method select{font-size:16px;height:45px;padding:8px 10px}
+  .community-app .discovery-search>.button{min-height:45px}
+  .discovery-results-heading{align-items:start;gap:10px}
+  .discovery-results-heading h2{font-size:21px}
+  .discovery-results-heading>span{font-size:10px;padding-top:5px}
+  .community-start{grid-template-columns:auto minmax(0,1fr);gap:12px;padding:20px 16px;margin-top:22px}
+  .community-start h2{font-size:17px}
+  .community-start p{font-size:11px}
+  .community-start>.quiet-link{grid-column:2;justify-self:start}
+}

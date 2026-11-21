@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import type {Metadata} from 'next';
 import {notFound,redirect} from 'next/navigation';
 import {Coffee,MapPin} from 'lucide-react';
 import {supabase} from '@/lib/supabase/server';
@@ -16,12 +17,23 @@ import {RecipeEditor} from '@/components/recipe-editor';
 import {RecipeDetail} from '@/components/recipe-detail';
 import {AccountPage} from '@/components/account-page';
 import {Moderation} from '@/components/moderation';
+import {StarterRecipeDetail} from '@/components/starter-recipes';
+import {getStarterRecipe,starterToInput} from '@/lib/starter-recipes';
+import {authHref,safeAuthNext} from '@/lib/auth-navigation';
 export const dynamic='force-dynamic';
+export async function generateMetadata({params}:{params:Promise<{slug?:string[]}>}):Promise<Metadata>{
+ const path=(await params).slug||[];
+ if(path[0]==='learn'&&path.length===2){const recipe=getStarterRecipe(path[1]);if(recipe)return {title:recipe.title,description:recipe.description,openGraph:{title:recipe.title,description:recipe.description,type:'article',url:`https://goatlab.my/learn/${recipe.slug}`,siteName:'Goat Journey Community'},twitter:{card:'summary',title:recipe.title,description:recipe.description}};}
+ if(path[0]==='auth'||path[0]==='account'||path[0]==='moderation'||path[1]==='new'||path[2]==='edit')return {robots:{index:false,follow:false}};
+ return {};
+}
 function Pagination({page,more,base,query}:{page:number;more?:boolean;base:string;query:Record<string,string>}){function href(p:number){return `${base}?${new URLSearchParams({...query,page:String(p+1)})}`;}return (page>0||more)?<nav className="pagination" aria-label="صفحات النتائج">{page>0&&<Link className="button secondary small" href={href(page-1)}>السابق</Link>}<span>صفحة {page+1}</span>{more&&<Link className="button secondary small" href={href(page+1)}>التالي</Link>}</nav>:null;}
 export default async function CommunityPage({params,searchParams}:{params:Promise<{slug?:string[]}>;searchParams:Promise<Record<string,string|string[]|undefined>>}){
  const path=(await params).slug||[];const search=await searchParams;const value=(key:string)=>typeof search[key]==='string'?search[key] as string:'';const page=Math.min(1000,Math.max(0,(Number.parseInt(value('page'),10)||1)-1));const q=value('q').slice(0,120);const method=value('method').slice(0,80);const tab=['drafts','saved','profile'].includes(value('tab'))?value('tab'):'published';
  const route=path.join('/');const isAuth=path[0]==='auth'&&path.length===2&&['login','signup','forgot','reset','resend','verify'].includes(path[1]);const isNew=route==='recipes/new';const isDetail=path[0]==='recipes'&&path.length===2&&!isNew;const isEdit=path[0]==='recipes'&&path.length===3&&path[2]==='edit';const isMember=path[0]==='members'&&path.length===2;
- if(!(route===''||route==='explore'||route==='account'||route==='moderation'||isAuth||isNew||isDetail||isEdit||isMember))notFound();
+ const isLearn=path[0]==='learn'&&path.length===2;const starter=isLearn?getStarterRecipe(path[1]):undefined;const template=isNew&&value('template')?getStarterRecipe(value('template')):undefined;
+ if(!(route===''||route==='explore'||route==='account'||route==='moderation'||isAuth||isNew||isDetail||isEdit||isMember||isLearn))notFound();
+ if((isLearn&&!starter)||(isNew&&value('template')&&!template))notFound();
  if(route===''&&['q','method','page'].some(key=>key in search))redirect('/explore?'+new URLSearchParams({q,method,page:String(page+1)}));
  if((isDetail||isEdit)&&!uuid.safeParse(path[1]).success)notFound();
  let viewer:Viewer|null=null;let data:PageData={};let unavailable=false;let missing=false;let denied=false;
@@ -37,14 +49,18 @@ export default async function CommunityPage({params,searchParams}:{params:Promis
    }
  }catch(error){if(error instanceof HttpError&&error.status===404)missing=true;else{unavailable=true;console.error(JSON.stringify({event:'page_data_unavailable',code:(error as {code?:string}).code||'connection'}));}}
  if(missing)notFound();
- if((isNew||isEdit||route==='account'||route==='moderation'||route==='auth/reset')&&!viewer&&!unavailable)redirect('/auth/login');
+ const destinationQuery=new URLSearchParams();if(isNew&&template)destinationQuery.set('template',template.slug);if(route==='account'&&value('tab'))destinationQuery.set('tab',tab);
+ const destination=`/${route}${destinationQuery.size?`?${destinationQuery}`:''}`;
+ if((isNew||isEdit||route==='account'||route==='moderation'||route==='auth/reset')&&!viewer&&!unavailable)redirect(authHref('login',destination));
  if((route==='moderation'&&!viewer?.moderator)||denied)return <Shell viewer={viewer}><div className="empty"><h1>هذه الصفحة غير متاحة لحسابك.</h1><Link className="button" href="/">العودة للمجتمع</Link></div></Shell>;
- if(isAuth)return <Shell viewer={viewer} active={route}><AuthForm key={path[1]} mode={path[1]} signupEnabled={!unavailable&&publicSignupEnabled()} confirmationError={!!value('error')}/></Shell>;
+ if(isAuth&&viewer&&['login','signup'].includes(path[1]))redirect(safeAuthNext(value('next')));
+ if(isAuth)return <Shell viewer={viewer} active={route} authNext={safeAuthNext(value('next'))}><AuthForm key={`${path[1]}-${value('next')}`} mode={path[1]} returnTo={safeAuthNext(value('next'))} signupEnabled={!unavailable&&publicSignupEnabled()} confirmationError={!!value('error')}/></Shell>;
  if(route==='')return <Shell viewer={viewer} landing><Landing/></Shell>;
+ if(isLearn&&starter)return <Shell viewer={viewer} active={route}><StarterRecipeDetail recipe={starter} signedIn={!!viewer}/></Shell>;
  if(unavailable)return <Shell viewer={viewer}><section className="connection-state"><Coffee size={40} strokeWidth={1.2}/><span className="eyebrow">GOAT JOURNEY COMMUNITY</span><h1>نحضّر المساحة لتجاربكم.</h1><p>تعذّر تحميل المجتمع الآن. حاول مجددًا بعد قليل.</p><Link className="button" href="/">إعادة المحاولة</Link></section></Shell>;
  return <Shell viewer={viewer} active={route} accountTab={tab}>
  {route==='explore'&&<Explore data={data} viewer={viewer} q={q} method={method} page={page}/>}
- {(isNew||isEdit)&&<RecipeEditor key={data.recipe?`${data.recipe.id}-${data.recipe.version}`:'new'} recipe={data.recipe} categories={data.categories||[]}/>}
+ {(isNew||isEdit)&&<RecipeEditor key={data.recipe?`${data.recipe.id}-${data.recipe.version}`:`new-${template?.slug||'blank'}`} ownerId={viewer!.id} recipe={data.recipe} template={template?starterToInput(template):undefined} templateKey={template?.slug} categories={data.categories||[]}/>}
  {isDetail&&data.recipe&&<RecipeDetail key={data.recipe.id} recipe={data.recipe} comments={data.comments||[]} initialSaved={data.saved||false} viewer={viewer}/>}
  {route==='account'&&data.profile&&<AccountPage profile={data.profile} recipes={data.recipes||[]} tab={tab} pagination={<Pagination page={page} more={data.hasMore} base="/account" query={{tab}}/>}/>}
  {isMember&&data.profile&&<><section className="profile-heading"><Avatar profile={data.profile}/><div><span className="eyebrow">من أهل القهوة</span><h1>{data.profile.display_name}</h1><p dir="ltr">@{data.profile.username}</p>{data.profile.city&&<p><MapPin size={16}/>{data.profile.city}{data.profile.workplace&&` · ${data.profile.workplace}`}</p>}<p className="preserve">{data.profile.bio}</p></div></section><h2>وصفات شاركها مع المجتمع</h2><Cards recipes={data.recipes||[]}/><Pagination page={page} more={data.hasMore} base={`/members/${path[1]}`} query={{}}/></>}

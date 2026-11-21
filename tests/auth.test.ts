@@ -1,10 +1,12 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import {normalizeEmailCode} from '../src/lib/email-code';
 
-const {auth}=vi.hoisted(()=>({auth:{signUp:vi.fn(),verifyOtp:vi.fn(),resend:vi.fn(),signOut:vi.fn(),signInWithPassword:vi.fn(),resetPasswordForEmail:vi.fn(),updateUser:vi.fn()}}));
+const {auth}=vi.hoisted(()=>({auth:{signUp:vi.fn(),verifyOtp:vi.fn(),resend:vi.fn(),signOut:vi.fn(),signInWithPassword:vi.fn(),resetPasswordForEmail:vi.fn(),updateUser:vi.fn(),exchangeCodeForSession:vi.fn()}}));
 vi.mock('@/lib/supabase/server',()=>({supabase:async()=>({auth})}));
 vi.mock('@/lib/data',()=>({requireUser:vi.fn()}));
 import {POST} from '../src/app/api/auth/[action]/route';
+import {GET as callback} from '../src/app/auth/callback/route';
+import {GET as confirm} from '../src/app/auth/confirm/route';
 
 function request(action:string,body:unknown,origin='https://goatlab.my') {
   return POST(new Request(`https://goatlab.my/api/auth/${action}`,{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify(body)}),{params:Promise.resolve({action})});
@@ -30,7 +32,61 @@ describe('email confirmation code',()=>{
   });
 });
 
+describe('email confirmation links',()=>{
+  it('keeps recovery on the local reset page and only carries a safe return destination',async()=>{
+    auth.verifyOtp.mockResolvedValue({error:null});
+    const next='/recipes/new?template=v60-first-cup';
+    const recovered=await confirm(new Request('https://goatlab.my/auth/confirm?'+new URLSearchParams({token_hash:'test-recovery-token',type:'recovery',next:'//foreign.invalid',returnTo:next})));
+    expect(recovered.status).toBe(303);
+    const destination=new URL(recovered.headers.get('location')!);
+    expect(destination.origin).toBe('https://goatlab.my');
+    expect(destination.pathname).toBe('/auth/reset');
+    expect(destination.searchParams.get('next')).toBe(next);
+    expect(auth.verifyOtp).toHaveBeenCalledWith({token_hash:'test-recovery-token',type:'recovery'});
+    const unsafe=await confirm(new Request('https://goatlab.my/auth/confirm?'+new URLSearchParams({token_hash:'test-recovery-token',type:'recovery',returnTo:'/%2f%2fforeign.invalid'})));
+    expect(unsafe.headers.get('location')).toBe('https://goatlab.my/auth/reset');
+  });
+  it('retains safe signup intent on success or error without returning tokens or remote URLs',async()=>{
+    const next='/learn/v60-first-cup';
+    const url='https://goatlab.my/auth/confirm?'+new URLSearchParams({token_hash:'private-test-token',type:'signup',next});
+    auth.verifyOtp.mockResolvedValueOnce({error:null}).mockResolvedValueOnce({error:{message:'expired'}}).mockResolvedValueOnce({error:null});
+    expect((await confirm(new Request(url))).headers.get('location')).toBe('https://goatlab.my'+next);
+    const failed=await confirm(new Request(url));
+    const destination=new URL(failed.headers.get('location')!);
+    expect(destination.pathname).toBe('/auth/login');
+    expect(destination.searchParams.get('next')).toBe(next);
+    expect(destination.searchParams.get('error')).toBe('confirmation');
+    expect(destination.href).not.toContain('private-test-token');
+    const unsafe=await confirm(new Request('https://goatlab.my/auth/confirm?'+new URLSearchParams({token_hash:'test',type:'email',next:'https://foreign.invalid'})));
+    expect(unsafe.headers.get('location')).toBe('https://goatlab.my/account');
+  });
+});
+
 describe('free registration boundaries',()=>{
+  it('accepts a continuation separately from strict credentials and never forwards it to sign-in',async()=>{
+    auth.signInWithPassword.mockResolvedValue({error:null});
+    expect((await request('login',{...signup,next:'/recipes/new?template=v60-first-cup'})).status).toBe(200);
+    expect(auth.signInWithPassword).toHaveBeenCalledWith({email:signup.email,password:signup.password,options:{captchaToken:'test-captcha'}});
+    auth.verifyOtp.mockResolvedValue({data:{session:{},user:{email_confirmed_at:'2026-11-20'}},error:null});
+    const verified=await request('verify',{email:signup.email,token:'012345',next:'/recipes/new?template=v60-first-cup'});
+    expect(await verified.json()).toEqual({ok:true,next:'/recipes/new?template=v60-first-cup'});
+    const unsafe=await request('verify',{email:signup.email,token:'012345',next:'//foreign.invalid'});
+    expect(await unsafe.json()).toEqual({ok:true,next:'/account'});
+  });
+  it('retains safe intent through email callback and recovery without external redirects',async()=>{
+    auth.exchangeCodeForSession.mockResolvedValue({error:null});
+    const next='/recipes/new?template=v60-first-cup';
+    const returned=await callback(new Request('https://goatlab.my/auth/callback?'+new URLSearchParams({code:'test',next})));
+    expect(returned.headers.get('location')).toBe('https://goatlab.my'+next);
+    const recovery=await callback(new Request('https://goatlab.my/auth/callback?'+new URLSearchParams({code:'test',next:'/auth/reset',returnTo:next})));
+    expect(new URL(recovery.headers.get('location')!).searchParams.get('next')).toBe(next);
+    const unsafe=await callback(new Request('https://goatlab.my/auth/callback?code=test&next=https://foreign.invalid'));
+    expect(unsafe.headers.get('location')).toBe('https://goatlab.my/account');
+    auth.resetPasswordForEmail.mockResolvedValue({error:null});
+    expect((await request('forgot',{email:signup.email,captchaToken:'test-captcha',next})).status).toBe(200);
+    const resetLink=new URL(auth.resetPasswordForEmail.mock.calls[0][1].redirectTo);
+    expect(resetLink.searchParams.get('next')).toBe('/auth/reset');expect(resetLink.searchParams.get('returnTo')).toBe(next);
+  });
   it('rejects cross-origin verification before reaching Auth',async()=>{
     expect((await request('verify',{email:signup.email,token:'012345'},'https://foreign.invalid')).status).toBe(403);
     expect(auth.verifyOtp).not.toHaveBeenCalled();

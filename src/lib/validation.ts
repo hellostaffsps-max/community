@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {normalizeEmailCode} from './email-code';
+import {deriveIngredientMetrics,ingredientMetric} from './recipe-quantities';
 const short=(max:number)=>z.string().trim().max(max).default('');
 const metric=(max:number,min=0)=>z.number().finite().min(min).max(max).nullable().optional();
 export const uuid=z.uuid();
@@ -12,9 +13,15 @@ export const recipeSchema=z.object({
   ingredients:z.array(z.object({name:z.string().trim().min(1).max(100),quantity:metric(100000,0.01),unit:short(30)})).max(30),
   steps:z.array(z.object({instruction:z.string().trim().min(1).max(2000)})).max(30)
 }).strict().superRefine((r,ctx)=>{
+  const derived=deriveIngredientMetrics(r.ingredients);
+  for(const [path,message] of Object.entries(derived.errors))ctx.addIssue({code:'custom',message,path:path.split('.').map(part=>/^\d+$/.test(part)?Number(part):part)});
+  for(const key of ['dose_g','water_g'] as const){
+    if(derived[key]!=null&&r[key]!=null&&Math.abs(derived[key]-r[key])>0.000001)ctx.addIssue({code:'custom',message:'كمية البن والماء يجب أن تطابق المقادير.',path:[key]});
+    if(derived[key]!=null&&derived[key]>(key==='dose_g'?1000:20000))ctx.addIssue({code:'custom',message:'مجموع المقادير يتجاوز الحد المسموح.',path:[key]});
+  }
   if(r.id&&!r.version)ctx.addIssue({code:'custom',message:'أعد تحميل الوصفة قبل تعديلها',path:['version']});
   if(r.status==='published'&&(!r.ingredients.length||!r.steps.length))ctx.addIssue({code:'custom',message:'أضف مكوّنًا وخطوة تحضير على الأقل قبل النشر',path:['steps']});
-});
+}).transform(r=>{const derived=deriveIngredientMetrics(r.ingredients);return {...r,...(r.ingredients.some(row=>ingredientMetric(row.name)==='dose_g')?{dose_g:derived.dose_g}:{}),...(r.ingredients.some(row=>ingredientMetric(row.name)==='water_g')?{water_g:derived.water_g}:{})};});
 export type RecipeInput=z.infer<typeof recipeSchema>;
 export const profileSchema=z.object({username:z.string().trim().toLowerCase().regex(/^[a-z0-9_]{3,30}$/),display_name:z.string().trim().min(1).max(60),bio:short(500),city:short(80),workplace:short(120),country_code:z.string().regex(/^[A-Z]{2}$/).default('PS')}).strict();
 export const commentSchema=z.object({recipe_id:uuid,body:z.string().trim().min(1).max(2000)}).strict();

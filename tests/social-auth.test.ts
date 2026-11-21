@@ -60,7 +60,7 @@ describe('configured social provider discovery',()=>{
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url,options]=fetchMock.mock.calls[0];
     expect(url).toBe(project+'/auth/v1/settings');
-    expect(options).toMatchObject({headers:{apikey:publishable},cache:'no-store',credentials:'omit',redirect:'error'});
+    expect(options).toMatchObject({headers:{apikey:publishable},cache:'no-store',credentials:'omit',redirect:'manual'});
     expect(new Headers(options?.headers).has('authorization')).toBe(false);
     expect(new Headers(options?.headers).has('cookie')).toBe(false);
     expect(options?.signal).toBeInstanceOf(AbortSignal);
@@ -69,6 +69,23 @@ describe('configured social provider discovery',()=>{
     expect(await availableSocialProviders()).toEqual(['google']);
     fetchMock.mockResolvedValue(settingsResponse({disable_signup:false,external:{google:true,apple:true}}));
     expect(await availableSocialProviders()).toEqual(['google','apple']);
+  });
+  it('rejects redirected settings without following Location or trusting a provider-enabled redirect body',async()=>{
+    for(const status of [301,302,303,307,308]){
+      fetchMock.mockClear();
+      const response=Response.json(allowed,{status,headers:{location:'https://foreign.invalid/settings'}});
+      const readBody=vi.spyOn(response,'json');
+      fetchMock.mockResolvedValueOnce(response);
+      expect(await availableSocialProviders()).toEqual([]);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0]).toBe(project+'/auth/v1/settings');
+      expect(fetchMock.mock.calls[0][1]?.redirect).toBe('manual');
+      expect(readBody).not.toHaveBeenCalled();
+    }
+    const followed=Response.json(allowed);
+    Object.defineProperty(followed,'redirected',{value:true});
+    fetchMock.mockResolvedValueOnce(followed);
+    expect(await availableSocialProviders()).toEqual([]);
   });
   it('fails closed only for social providers when settings are missing, malformed or unavailable',async()=>{
     for(const result of [{external:{google:true}},{disable_signup:false,external:{google:'true'}},{disable_signup:true,external:{google:true}}]){

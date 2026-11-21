@@ -24,9 +24,10 @@ export async function availableSocialProviders():Promise<SocialProvider[]> {
   try{
     const config=socialConnection();if(!config)return [];
     const response=await fetch(config.origin+'/auth/v1/settings',{
-      headers:{apikey:config.key},cache:'no-store',credentials:'omit',redirect:'error',signal:AbortSignal.timeout(5000),
+      // Workers rejects redirect:'error' before sending; manual preserves our no-redirect policy.
+      headers:{apikey:config.key},cache:'no-store',credentials:'omit',redirect:'manual',signal:AbortSignal.timeout(5000),
     });
-    if(!response.ok)return [];
+    if(!response.ok||response.redirected)return [];
     const parsed=publicSettingsSchema.safeParse(await response.json());
     if(!parsed.success)return [];
     return socialProviders.filter(provider=>parsed.data.external[provider]===true);
